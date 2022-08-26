@@ -618,3 +618,40 @@ main方法调用t方法
 
 ## 常见方法
 
+
+
+*  **start()：**启动一个新线 程，在新的线程 运行 run 方法 中的代码。start 方法只是让线程进入就绪，里面代码不一定立刻 运行（CPU 的时间片还没分给它）。每个线程对象的 start方法只能调用一次，如果调用了多次会出现 IllegalThreadStateException
+* **run()：**新线程启动后会调用的方法。如果在构造 Thread 对象时传递了 Runnable 参数，则 线程启动后会调用 Runnable 中的 run 方法，否则默 认不执行任何操作。但可以创建 Thread 的子类对象， 来覆盖默认行为
+* **join()：**等待线程运行结 束
+* **join(long n)：**等待线程运行结 束,最多等待 n 毫秒
+* **getId() ：**获取线程长整型 的 id 。id 唯一
+* **getName()：**获取线程名
+* **setName(String)：**修改线程名
+* **getPriority()：**获取线程优先级
+* **setPriority(int)：**修改线程优先级。java中规定线程优先级是1~10 的整数，较大的优先级 能提高该线程被 CPU 调度的机率
+* **getState() ：**获取线程状态。Java 中线程状态是用 6 个 enum 表示，分别为： NEW, RUNNABLE, BLOCKED, WAITING,  TIMED_WAITING, TERMINATED
+* **isInterrupted()：**判断是否被打断。不会清除 打断标记
+* **isAlive()：**线程是否存活 （还没有运行完毕）
+* **interrupt()：**打断线程。如果被打断线程正在 sleep，wait，join 会导致被打断 的线程抛出 InterruptedException，并清除打断标 记 ；如果打断的正在运行的线程，则会设置打断标 记 ；park 的线程被打断，也会设置打断标记
+* **interrupted()：**判断当前线程是否被打断。会清除打断标记。静态方法
+* **currentThread()：**获取当前正在执 行的线程。静态方法
+* **sleep(long n)：**让当前执行的线 程休眠n毫秒， 休眠时让出 cpu 的时间片给其它线程。静态方法
+* **yield() ：**提示线程调度器 让出当前线程对 CPU的使用。主要是为了测试和调试。静态方法
+
+
+
+
+
+## start 与 run
+
+* 直接调用 run 是在主线程中执行了 run，没有启动新的线程
+* 使用 start 是启动新的线程，通过新的线程间接执行 run 中的代码
+
+
+
+## sleep 与 yield
+
+
+
+
+
