@@ -491,3 +491,130 @@ public class Calculate_Async
 
 # Java 线程
 
+## 创建和运行线程
+
+
+
+方法一，直接使用 Thread：
+
+```java
+// 创建线程对象
+Thread t = new Thread() {
+ public void run() {
+ // 要执行的任务
+ }
+};
+// 启动线程
+t.start();
+```
+
+
+
+方法二，使用 Runnable 配合 Thread
+
+```java
+Runnable runnable = new Runnable() {
+ public void run(){
+ // 要执行的任务
+ }
+};
+// 创建线程对象
+Thread t = new Thread( runnable );
+// 启动线程
+t.start(); 
+```
+
+
+
+方法三，FutureTask 配合 Thread：
+
+```java
+// 创建任务对象
+FutureTask<Integer> task3 = new FutureTask<>(() -> {
+ log.debug("hello");
+ return 100;
+});
+// 参数1 是任务对象; 参数2 是线程名字，推荐
+new Thread(task3, "t3").start();
+// 主线程阻塞，同步等待 task 执行完毕的结果
+Integer result = task3.get();
+log.debug("结果是:{}", result);
+```
+
+
+
+
+
+## 栈与栈帧
+
+Java Virtual Machine Stacks （Java 虚拟机栈）
+
+我们都知道 JVM 中由堆、栈、方法区所组成，其中栈内存是给谁用的呢？其实就是线程，每个线程启动后，虚拟 机就会为其分配一块栈内存。
+
+* 每个栈由多个栈帧（Frame）组成，对应着每次方法调用时所占用的内存
+* 每个线程只能有一个活动栈帧，对应着当前正在执行的那个方法
+
+
+
+比如：main方法调用t方法
+
+
+
+当函数开始执行的时候，会先将main方法压入栈中
+
+![image-20220826200809004](img/java并发编程学习笔记/image-20220826200809004.png)
+
+
+
+main方法调用t方法
+
+
+
+![image-20220826200859030](img/java并发编程学习笔记/image-20220826200859030.png)
+
+
+
+ **每一个栈帧都包含**
+
+​    **1.局部变量表**
+
+​    **2.操作数栈**
+
+​    **3.返回地址**
+
+​    **4.动态链接（指向运行时常量池的引用）**
+
+
+
+![image-20220826200931983](img/java并发编程学习笔记/image-20220826200931983.png)
+
+
+
+
+
+
+
+
+
+## 线程上下文切换
+
+因为以下一些原因导致 cpu 不再执行当前的线程，转而执行另一个线程的代码
+
+* 线程的 cpu 时间片用完
+* 垃圾回收
+* 有更高优先级的线程需要运行
+* 线程自己调用了 sleep、yield、wait、join、park、synchronized、lock 等方法
+
+
+
+当 Context Switch 发生时，需要由操作系统保存当前线程的状态，并恢复另一个线程的状态，Java 中对应的概念 就是程序计数器（Program Counter Register），它的作用是记住下一条 jvm 指令的执行地址，是线程私有的
+
+* 状态包括程序计数器、虚拟机栈中每个栈帧的信息，如局部变量、操作数栈、返回地址等
+* Context Switch 频繁发生会影响性能
+
+
+
+
+
+## 常见方法
+
