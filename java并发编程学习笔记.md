@@ -859,3 +859,386 @@ public static native void yield();
 
 
 
+```java
+package mao;
+
+/**
+ * Project name(项目名称)：java并发编程_线程优先级
+ * Package(包名): mao
+ * Class(类名): Test1
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/8/26
+ * Time(创建时间)： 20:53
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test1
+{
+    private static int a = 0;
+    private static int b = 0;
+
+    public static void main(String[] args) throws InterruptedException
+    {
+        Thread thread1 = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                while (true)
+                {
+                    a++;
+                }
+            }
+        }, "t1");
+
+        Thread thread2 = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                while (true)
+                {
+                    b++;
+                }
+            }
+        }, "t2");
+
+        //启动线程
+        thread1.start();
+        thread2.start();
+
+        //主线程休眠
+        Thread.sleep(2000);
+
+        //强制打断线程
+        thread1.stop();
+        thread2.stop();
+
+        //查看a和b的值
+        System.out.println("a=" + a);
+        System.out.println("b=" + b);
+        //优先级一样，a和b的值也差不多
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+a=172403497
+b=153380774
+```
+
+```sh
+a=172840004
+b=229767254
+```
+
+```sh
+a=160737324
+b=167375710
+```
+
+
+
+
+
+```java
+package mao;
+
+/**
+ * Project name(项目名称)：java并发编程_线程优先级
+ * Package(包名): mao
+ * Class(类名): Test2
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/8/26
+ * Time(创建时间)： 21:02
+ * Version(版本): 1.0
+ * Description(描述)： yield方法让出CPU使用权
+ */
+
+public class Test2
+{
+    private static int a = 0;
+    private static int b = 0;
+
+    public static void main(String[] args) throws InterruptedException
+    {
+        Thread thread1 = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                while (true)
+                {
+                    a++;
+                }
+            }
+        }, "t1");
+
+        Thread thread2 = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                while (true)
+                {
+                    b++;
+                    //自增后调用yield方法
+                    Thread.yield();
+                }
+            }
+        }, "t2");
+
+        //启动线程
+        thread1.start();
+        thread2.start();
+
+        //主线程休眠
+        Thread.sleep(2000);
+
+        //强制打断线程
+        thread1.stop();
+        thread2.stop();
+
+        //查看a和b的值
+        System.out.println("a=" + a);
+        System.out.println("b=" + b);
+        //线程2每次自增后调用yield方法，a远大于b
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+a=238488195
+b=11278176
+```
+
+```sh
+a=247029331
+b=11722908
+```
+
+```sh
+a=264029438
+b=12110354
+```
+
+
+
+```java
+package mao;
+
+/**
+ * Project name(项目名称)：java并发编程_线程优先级
+ * Package(包名): mao
+ * Class(类名): Test3
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/8/26
+ * Time(创建时间)： 21:06
+ * Version(版本): 1.0
+ * Description(描述)： 更改线程的优先级
+ */
+
+public class Test3
+{
+    private static int a = 0;
+    private static int b = 0;
+
+    public static void main(String[] args) throws InterruptedException
+    {
+        Thread thread1 = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                while (true)
+                {
+                    a++;
+                }
+            }
+        }, "t1");
+
+        Thread thread2 = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                while (true)
+                {
+                    b++;
+                }
+            }
+        }, "t2");
+
+        //更改优先级
+        thread1.setPriority(1);
+        thread2.setPriority(10);
+
+        //启动线程
+        thread1.start();
+        thread2.start();
+
+        //主线程休眠
+        Thread.sleep(2000);
+
+        //强制打断线程
+        thread1.stop();
+        thread2.stop();
+
+        //查看a和b的值
+        System.out.println("a=" + a);
+        System.out.println("b=" + b);
+        
+    }
+}
+```
+
+
+
+如果 cpu 比较忙，那么优先级高的线程会获得更多的时间片，但 cpu 闲时，优先级几乎没作用
+
+
+
+```java
+package mao;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Project name(项目名称)：java并发编程_线程优先级
+ * Package(包名): mao
+ * Class(类名): Test3
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/8/26
+ * Time(创建时间)： 21:06
+ * Version(版本): 1.0
+ * Description(描述)： 更改线程的优先级
+ */
+
+public class Test3
+{
+    private static int a = 0;
+    private static int b = 0;
+
+    /**
+     * 使CPU使用率达到100%
+     */
+    public static void t()
+    {
+        int threadCount = 15;
+        List<Thread> threads = new ArrayList<>();
+        for (int i = 0; i < threadCount; i++)
+        {
+            Thread thread = new Thread(new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    //死循环
+                    while (true)
+                    {
+
+                    }
+                }
+            });
+            //设置为守护线程
+            thread.setDaemon(true);
+            threads.add(thread);
+        }
+        //启动线程
+        for (Thread thread : threads)
+        {
+            thread.start();
+        }
+    }
+
+    public static void main(String[] args) throws InterruptedException
+    {
+        Thread thread1 = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                while (true)
+                {
+                    a++;
+                }
+            }
+        }, "t1");
+
+        Thread thread2 = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                while (true)
+                {
+                    b++;
+                }
+            }
+        }, "t2");
+
+        //更改优先级
+        thread1.setPriority(1);
+        thread2.setPriority(10);
+
+        //启动线程
+        t();
+        thread1.start();
+        thread2.start();
+
+        //主线程休眠
+        Thread.sleep(2000);
+
+        //强制打断线程
+        thread1.stop();
+        thread2.stop();
+
+        //查看a和b的值
+        System.out.println("a=" + a);
+        System.out.println("b=" + b);
+
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+a=120955355
+b=487451855
+```
+
+```sh
+a=117420720
+b=542875659
+```
+
+```sh
+a=194952269
+b=272184251
+```
+
+
+
+
+
