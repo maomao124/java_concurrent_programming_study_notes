@@ -651,7 +651,211 @@ main方法调用t方法
 
 ## sleep 与 yield
 
+### sleep
 
+* 调用 sleep 会让当前线程从 Running 进入 Timed Waiting 状态（阻塞）
+* 其它线程可以使用 interrupt 方法打断正在睡眠的线程，这时 sleep 方法会抛出 InterruptedException
+* 睡眠结束后的线程未必会立刻得到执行
+* 建议用 TimeUnit 的 sleep 代替 Thread 的 sleep 来获得更好的可读性
+
+
+
+
+
+```java
+package mao.sleep;
+
+/**
+ * Project name(项目名称)：java并发编程_sleep和yield
+ * Package(包名): mao.sleep
+ * Class(类名): Test1
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/8/26
+ * Time(创建时间)： 20:28
+ * Version(版本): 1.0
+ * Description(描述)： 调用 sleep 会让当前线程从 Running 进入 Timed Waiting 状态（阻塞）
+ */
+
+public class Test1
+{
+    public static void main(String[] args) throws InterruptedException
+    {
+        Thread thread = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                try
+                {
+                    Thread.sleep(3000);
+                }
+                catch (InterruptedException e)
+                {
+                    e.printStackTrace();
+                }
+            }
+        });
+        System.out.println(thread.getState());
+        thread.start();
+        System.out.println(thread.getState());
+        Thread.sleep(30);
+        System.out.println(thread.getState());
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+NEW
+RUNNABLE
+TIMED_WAITING
+```
+
+
+
+
+
+```java
+package mao.sleep;
+
+/**
+ * Project name(项目名称)：java并发编程_sleep和yield
+ * Package(包名): mao.sleep
+ * Class(类名): Test2
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/8/26
+ * Time(创建时间)： 20:31
+ * Version(版本): 1.0
+ * Description(描述)： 睡眠结束后的线程未必会立刻得到执行
+ */
+
+public class Test2
+{
+    public static void main(String[] args) throws InterruptedException
+    {
+        //------------------------------------------------------
+        long startTime = System.currentTimeMillis();    //获取开始时间
+        //------------------------------------------------------
+
+        Thread.sleep(100);
+        //时间消耗大于100毫秒
+
+        //------------------------------------------------------
+        long endTime = System.currentTimeMillis();    //获取结束时间
+        System.out.println("程序运行时间：" + (endTime - startTime) + "ms");    //输出程序运行时间
+        //------------------------------------------------------
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+程序运行时间：107ms
+```
+
+
+
+```java
+package mao.sleep;
+
+import java.util.concurrent.TimeUnit;
+
+/**
+ * Project name(项目名称)：java并发编程_sleep和yield
+ * Package(包名): mao.sleep
+ * Class(类名): Test3
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/8/26
+ * Time(创建时间)： 20:38
+ * Version(版本): 1.0
+ * Description(描述)： 建议用 TimeUnit 的 sleep 代替 Thread 的 sleep 来获得更好的可读性
+ */
+
+public class Test3
+{
+    public static void main(String[] args) throws InterruptedException
+    {
+        //------------------------------------------------------
+        long startTime = System.currentTimeMillis();    //获取开始时间
+        //------------------------------------------------------
+
+        TimeUnit.SECONDS.sleep(2);
+        //两秒
+        //TimeUnit.MINUTES.sleep(1);
+        //一分钟
+
+        //------------------------------------------------------
+        long endTime = System.currentTimeMillis();    //获取结束时间
+        System.out.println("程序运行时间：" + (endTime - startTime) + "ms");    //输出程序运行时间
+        //------------------------------------------------------
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+程序运行时间：2002ms
+```
+
+
+
+
+
+### yield
+
+* 调用 yield 会让当前线程从 Running 进入 Runnable 就绪状态，然后调度执行其它线程
+* 具体的实现依赖于操作系统的任务调度器
+
+
+
+```java
+public class Thread implements Runnable 
+{
+/**
+ * A hint to the scheduler that the current thread is willing to yield
+ * its current use of a processor. The scheduler is free to ignore this
+ * hint.
+ *
+ * <p> Yield is a heuristic attempt to improve relative progression
+ * between threads that would otherwise over-utilise a CPU. Its use
+ * should be combined with detailed profiling and benchmarking to
+ * ensure that it actually has the desired effect.
+ *
+ * <p> It is rarely appropriate to use this method. It may be useful
+ * for debugging or testing purposes, where it may help to reproduce
+ * bugs due to race conditions. It may also be useful when designing
+ * concurrency control constructs such as the ones in the
+ * {@link java.util.concurrent.locks} package.
+ */
+public static native void yield();
+}
+```
+
+
+
+
+
+
+
+## 线程优先级
+
+* 线程优先级会提示（hint）调度器优先调度该线程，但它仅仅是一个提示，调度器可以忽略它
+* 如果 cpu 比较忙，那么优先级高的线程会获得更多的时间片，但 cpu 闲时，优先级几乎没作用
 
 
 
