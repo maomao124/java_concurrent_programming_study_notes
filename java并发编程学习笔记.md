@@ -1242,3 +1242,103 @@ b=272184251
 
 
 
+
+
+## join 方法
+
+
+
+```java
+static int r = 0;
+public static void main(String[] args) throws InterruptedException {
+ test1();
+}
+private static void test1() throws InterruptedException {
+ log.debug("开始");
+ Thread t1 = new Thread(() -> {
+ log.debug("开始");
+ Thread.sleep(1000);
+ log.debug("结束");
+ r = 10;
+ });
+ t1.start();
+ log.debug("结果为:{}", r);
+ log.debug("结束");
+}
+```
+
+
+
+* 因为主线程和线程 t1 是并行执行的，t1 线程需要 1 秒之后才能算出 r=10
+* 而主线程一开始就要打印 r 的结果，所以只能打印出 r=0
+
+
+
+想要在t1线程运行结束后立马打印结果，就需要用到join方法
+
+
+
+```java
+static int r = 0;
+public static void main(String[] args) throws InterruptedException {
+ test1();
+}
+private static void test1() throws InterruptedException {
+ log.debug("开始");
+ Thread t1 = new Thread(() -> {
+ log.debug("开始");
+ Thread.sleep(1000);
+ log.debug("结束");
+ r = 10;
+ });
+ t1.start();
+ t1.join();
+ log.debug("结果为:{}", r);
+ log.debug("结束");
+}
+```
+
+
+
+
+
+```java
+static int r1 = 0;
+static int r2 = 0;
+public static void main(String[] args) throws InterruptedException {
+ test2();
+}
+private static void test2() throws InterruptedException {
+ Thread t1 = new Thread(() -> {
+ sleep(1000);
+ r1 = 10;
+ });
+ Thread t2 = new Thread(() -> {
+ sleep(2000);
+ r2 = 20;
+ });
+ long start = System.currentTimeMillis();
+ t1.start();
+ t2.start();
+ t1.join();
+ t2.join();
+ long end = System.currentTimeMillis();
+ log.debug("r1: {} r2: {} cost: {}", r1, r2, end - start);
+}
+```
+
+
+
+* 第一个 join：等待 t1 时, t2 并没有停止, 而在运行
+* 第二个 join：1s 后, 执行到此, t2 也运行了 1s, 因此也只需再等待 1s
+
+
+
+所以，时间花费为两秒
+
+
+
+
+
+## interrupt 方法
+
