@@ -2483,3 +2483,162 @@ public class Test2
 
 ## synchronized
 
+语法：
+
+```java
+synchronized(对象)
+{
+   //临界区
+}
+```
+
+
+
+* synchronized(对象) 中的对象，可以想象为一个房间（room），有唯一入口（门）房间只能一次进入一人 进行计算，线程 t1，t2 想象成两个人
+* 当线程 t1 执行到 synchronized(room) 时就好比 t1 进入了这个房间，并锁住了门拿走了钥匙，在门内执行 count++ 代码
+* 这时候如果 t2 也运行到了 synchronized(room) 时，它发现门被锁住了，只能在门外等待，发生了上下文切换，阻塞住了
+* 这中间即使 t1 的 cpu 时间片不幸用完，被踢出了门外（不要错误理解为锁住了对象就能一直执行下去）， 这时门还是锁住的，t1 仍拿着钥匙，t2 线程还在阻塞状态进不来，只有下次轮到 t1 自己再次获得时间片时才能开门进入
+* 当 t1 执行完 synchronized{} 块内的代码，这时候才会从 obj 房间出来并解开门上的锁，唤醒 t2 线程把钥 匙给他。t2 线程这时才可以进入 obj 房间，锁住了门拿上钥匙，执行它的 count-- 代码
+
+
+
+
+
+![image-20220827220604717](img/java并发编程学习笔记/image-20220827220604717.png)
+
+![image-20220827220628234](img/java并发编程学习笔记/image-20220827220628234.png)
+
+
+
+
+
+synchronized 实际是用对象锁保证了临界区内代码的原子性，临界区内的代码对外是不可分割的，不会被线程切换所打断。
+
+
+
+
+
+## 改进
+
+把需要保护的共享变量放入一个类
+
+
+
+```java
+/**
+ * Project name(项目名称)：java并发编程_共享问题
+ * Package(包名): PACKAGE_NAME
+ * Class(类名): Test3
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/8/27
+ * Time(创建时间)： 22:09
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test3
+{
+
+    public static void main(String[] args) throws InterruptedException
+    {
+        Room room = new Room();
+
+        Thread t1 = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                for (int i = 0; i < 20000; i++)
+                {
+                    room.increment();
+                }
+            }
+        }, "t1");
+
+        Thread t2 = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                for (int i = 0; i < 20000; i++)
+                {
+                    room.decrement();
+                }
+            }
+        }, "t2");
+
+        t1.join();
+        t2.join();
+        //打印
+        System.out.println(room.get());
+    }
+}
+
+
+class Room
+{
+    private int value = 0;
+
+    /**
+     * 加1
+     */
+    public void increment()
+    {
+        synchronized (this)
+        {
+            value++;
+        }
+    }
+
+    /**
+     * 减1
+     */
+    public void decrement()
+    {
+        synchronized (this)
+        {
+            value--;
+        }
+    }
+
+    /**
+     * 取值
+     *
+     * @return value
+     */
+    public int get()
+    {
+        synchronized (this)
+        {
+            return value;
+        }
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+0
+```
+
+```sh
+0
+```
+
+```sh
+0
+```
+
+
+
+
+
+## synchronized加在方法上
+
+
+
