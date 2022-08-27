@@ -2059,3 +2059,427 @@ public enum State {
 
 # 共享模型之管程
 
+## 共享问题
+
+故事
+
+* 老王（操作系统）有一个功能强大的算盘（CPU），现在想把它租出去，赚一点外快
+* 小南、小女（线程）来使用这个算盘来进行一些计算，并按照时间给老王支付费用
+* 但小南不能一天24小时使用算盘，他经常要小憩一会（sleep），又或是去吃饭上厕所（阻塞 io 操作），有 时还需要一根烟，没烟时思路全无（wait）这些情况统称为（阻塞）
+* 在这些时候，算盘没利用起来（不能收钱了），老王觉得有点不划算
+* 另外，小女也想用用算盘，如果总是小南占着算盘，让小女觉得不公平
+* 于是，老王灵机一动，想了个办法 [ 让他们每人用一会，轮流使用算盘 ]
+* 这样，当小南阻塞的时候，算盘可以分给小女使用，不会浪费，反之亦然
+* 最近执行的计算比较复杂，需要存储一些中间结果，而学生们的脑容量（工作内存）不够，所以老王申请了 一个笔记本（主存），把一些中间结果先记在本上
+* 计算流程是这样的
+
+
+
+![image-20220827213020070](img/java并发编程学习笔记/image-20220827213020070.png)
+
+
+
+*  但是由于分时系统，有一天还是发生了事故
+* 小南刚读取了初始值 0 做了个 +1 运算，还没来得及写回结果
+* 老王说 [ 小南，你的时间到了，该别人了，记住结果走吧 ]，于是小南念叨着 [ 结果是1，结果是1...] 不甘心地 到一边待着去了（上下文切换）
+* 老王说 [ 小女，该你了 ]，小女看到了笔记本上还写着 0 做了一个 -1 运算，将结果 -1 写入笔记本
+* 这时小女的时间也用完了，老王又叫醒了小南：[小南，把你上次的题目算完吧]，小南将他脑海中的结果 1 写 入了笔记本
+
+
+
+![image-20220827213134035](img/java并发编程学习笔记/image-20220827213134035.png)
+
+
+
+* 小南和小女都觉得自己没做错，但笔记本里的结果是 1 而不是 0
+
+
+
+
+
+## 共享问题的java实现
+
+
+
+```java
+/**
+ * Project name(项目名称)：java并发编程_共享问题
+ * Package(包名): PACKAGE_NAME
+ * Class(类名): Test1
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/8/27
+ * Time(创建时间)： 21:33
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test1
+{
+    public static int count = 0;
+
+    public static void main(String[] args) throws InterruptedException
+    {
+        Thread t1 = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                for (int i = 0; i < 10000; i++)
+                {
+                    count++;
+                }
+            }
+        }, "t1");
+
+        Thread t2 = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                for (int i = 0; i < 10000; i++)
+                {
+                    count--;
+                }
+            }
+        }, "t2");
+
+        t1.start();
+        t2.start();
+        t1.join();
+        t2.join();
+        //输出
+        System.out.println(count);
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+-82
+```
+
+```sh
+-2122
+```
+
+```sh
+334
+```
+
+
+
+
+
+## 问题分析
+
+以上的结果可能是正数、负数、零。为什么呢？因为 Java 中对静态变量的自增，自减并不是原子操作，要彻底理 解，必须从字节码来进行分析 
+
+例如对于 i++ 而言（i 为静态变量），实际会产生如下的 JVM 字节码指令：
+
+
+
+```java
+getstatic i   // 获取静态变量i的值
+iconst_1      // 准备常量1
+iadd           // 自增
+putstatic i   // 将修改后的值存入静态变量i
+```
+
+
+
+而对应 i-- 也是类似
+
+```java
+getstatic i    // 获取静态变量i的值
+iconst_1       // 准备常量1
+isub          // 自减
+putstatic i   // 将修改后的值存入静态变量i
+```
+
+
+
+```java
+// class version 60.0 (60)
+// access flags 0x20
+class Test1$1 implements java/lang/Runnable {
+
+  // compiled from: Test1.java
+  NESTHOST Test1
+  OUTERCLASS Test1 main ([Ljava/lang/String;)V
+  // access flags 0x0
+  INNERCLASS Test1$1 null null
+
+  // access flags 0x0
+  <init>()V
+   L0
+    LINENUMBER 21 L0
+    ALOAD 0
+    INVOKESPECIAL java/lang/Object.<init> ()V
+    RETURN
+   L1
+    LOCALVARIABLE this LTest1$1; L0 L1 0
+    MAXSTACK = 1
+    MAXLOCALS = 1
+
+  // access flags 0x1
+  public run()V
+   L0
+    LINENUMBER 25 L0
+    ICONST_0
+    ISTORE 1
+   L1
+   FRAME APPEND [I]
+    ILOAD 1
+    SIPUSH 10000
+    IF_ICMPGE L2
+   L3
+    LINENUMBER 27 L3
+    GETSTATIC Test1.count : I
+    ICONST_1
+    IADD
+    PUTSTATIC Test1.count : I
+   L4
+    LINENUMBER 25 L4
+    IINC 1 1
+    GOTO L1
+   L2
+    LINENUMBER 29 L2
+   FRAME CHOP 1
+    RETURN
+   L5
+    LOCALVARIABLE i I L1 L2 1
+    LOCALVARIABLE this LTest1$1; L0 L5 0
+    MAXSTACK = 2
+    MAXLOCALS = 2
+}
+```
+
+
+
+而 Java 的内存模型如下，完成静态变量的自增，自减需要在主存和工作内存中进行数据交换
+
+
+
+![image-20220827214622005](img/java并发编程学习笔记/image-20220827214622005.png)
+
+
+
+如果是单线程，代码是顺序执行，不会交错，没有问题
+
+
+
+![image-20220827214723506](img/java并发编程学习笔记/image-20220827214723506.png)
+
+
+
+
+
+但多线程下，会出现问题
+
+
+
+出现负数的情况：
+
+![image-20220827214809053](img/java并发编程学习笔记/image-20220827214809053.png)
+
+
+
+
+
+出现正数的情况：
+
+![image-20220827215019209](img/java并发编程学习笔记/image-20220827215019209.png)
+
+
+
+
+
+
+
+## 临界区
+
+即Critical Section
+
+* 一个程序运行多个线程本身是没有问题的
+* 问题出在多个线程访问共享资源
+  * 多个线程读共享资源其实也没有问题
+  * 在多个线程对共享资源读写操作时发生指令交错，就会出现问题
+* 一段代码块内如果存在对共享资源的多线程读写操作，称这段代码块为临界区
+
+
+
+```java
+/**
+ * Project name(项目名称)：java并发编程_共享问题
+ * Package(包名): PACKAGE_NAME
+ * Class(类名): Test1
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/8/27
+ * Time(创建时间)： 21:33
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test1
+{
+    public static int count = 0;
+
+    public static void main(String[] args) throws InterruptedException
+    {
+        Thread t1 = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                for (int i = 0; i < 10000; i++)
+                {
+                    //临界区
+                    count++;
+                    //临界区结束
+                }
+            }
+        }, "t1");
+
+        Thread t2 = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                for (int i = 0; i < 10000; i++)
+                {
+                    //临界区
+                    count--;
+                    //临界区结束
+                }
+            }
+        }, "t2");
+
+        t1.start();
+        t2.start();
+        t1.join();
+        t2.join();
+        //输出
+        System.out.println(count);
+    }
+}
+
+```
+
+
+
+
+
+## 竞态条件
+
+即Race Condition
+
+多个线程在临界区内执行，由于代码的执行序列不同而导致结果无法预测，称之为发生了竞态条件
+
+
+
+
+
+## 解决
+
+为了避免临界区的竞态条件发生，有多种手段可以达到目的
+
+* 阻塞式的解决方案：synchronized，Lock
+* 非阻塞式的解决方案：原子变量
+
+
+
+
+
+```java
+/**
+ * Project name(项目名称)：java并发编程_共享问题
+ * Package(包名): PACKAGE_NAME
+ * Class(类名): Test2
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/8/27
+ * Time(创建时间)： 21:55
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test2
+{
+    public static int count = 0;
+
+    public static void main(String[] args) throws InterruptedException
+    {
+        Thread t1 = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                for (int i = 0; i < 10000; i++)
+                {
+                    synchronized (Test2.class)
+                    {
+                        //临界区
+                        count++;
+                        //临界区结束
+                    }
+                }
+            }
+        }, "t1");
+
+        Thread t2 = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                for (int i = 0; i < 10000; i++)
+                {
+                    synchronized (Test2.class)
+                    {
+                        //临界区
+                        count--;
+                        //临界区结束
+                    }
+                }
+            }
+        }, "t2");
+
+        t1.start();
+        t2.start();
+        t1.join();
+        t2.join();
+        //输出
+        System.out.println(count);
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+0
+```
+
+```sh
+0
+```
+
+```sh
+0
+```
+
+
+
+
+
+## synchronized
+
