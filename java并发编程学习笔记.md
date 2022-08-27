@@ -1487,3 +1487,419 @@ true
 
 
 
+```java
+package mao;
+
+/**
+ * Project name(项目名称)：java并发编程_两阶段终止
+ * Package(包名): mao
+ * Class(类名): Test1
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/8/27
+ * Time(创建时间)： 20:02
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test1
+{
+    public static void service()
+    {
+        System.out.println("----------------------------------");
+        Runtime r = Runtime.getRuntime();
+        float memory;
+        memory = r.totalMemory();
+        memory = memory / 1024 / 1024;
+        System.out.printf("JVM总内存：%.3fMB\n", memory);
+        memory = r.freeMemory();
+        memory = memory / 1024 / 1024;
+        System.out.printf(" 空闲内存：%.3fMB\n", memory);
+        memory = r.totalMemory() - r.freeMemory();
+        memory = memory / 1024 / 1024;
+        System.out.printf("已使用的内存：%.4fMB\n", memory);
+        System.out.println("----------------------------------");
+    }
+
+    public static void release()
+    {
+        System.out.println("释放资源");
+    }
+
+    public static Thread t1()
+    {
+        Thread thread = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                while (true)
+                {
+                    Thread currentThread = Thread.currentThread();
+                    if (currentThread.isInterrupted())
+                    {
+                        //被打断，料理后事，比如释放资源
+                        release();
+                        //结束循环
+                        break;
+                    }
+                    //没有被打断
+                    try
+                    {
+                        //睡眠
+                        Thread.sleep(1000);
+                        //无异常，执行业务
+                        service();
+                    }
+                    catch (InterruptedException e)
+                    {
+                        //有异常，设置打断标记
+                        currentThread.interrupt();
+                    }
+
+                }
+            }
+        });
+        thread.start();
+        return thread;
+    }
+
+    public static void main(String[] args) throws InterruptedException
+    {
+        Thread thread = t1();
+        Thread.sleep(3000);
+        thread.interrupt();
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+----------------------------------
+JVM总内存：256.000MB
+ 空闲内存：251.118MB
+已使用的内存：4.8820MB
+----------------------------------
+----------------------------------
+JVM总内存：256.000MB
+ 空闲内存：251.118MB
+已使用的内存：4.8820MB
+----------------------------------
+释放资源
+```
+
+
+
+
+
+**封装**
+
+
+
+```java
+package mao;
+
+/**
+ * Project name(项目名称)：java并发编程_两阶段终止
+ * Package(包名): mao
+ * Interface(接口名): ThreadService
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/8/27
+ * Time(创建时间)： 20:20
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public interface ThreadService
+{
+    /**
+     * 主业务
+     *
+     * @throws Exception 异常
+     */
+    void service() throws Exception;
+
+    /**
+     * 被打断后释放资源的业务
+     */
+    void release();
+}
+```
+
+
+
+```java
+package mao;
+
+/**
+ * Project name(项目名称)：java并发编程_两阶段终止
+ * Package(包名): mao
+ * Class(类名): T
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/8/27
+ * Time(创建时间)： 20:20
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class T
+{
+    /**
+     * 启动一个支持两阶段终止的线程，不需要调用start方法
+     *
+     * @param threadName    线程的名称
+     * @param intervals     调用service方法的间隔时间，单位为毫秒
+     * @param threadService 业务
+     * @return Thread对象
+     */
+    public static Thread startThread(String threadName, long intervals, ThreadService threadService)
+    {
+        Thread thread = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                while (true)
+                {
+                    Thread currentThread = Thread.currentThread();
+                    if (currentThread.isInterrupted())
+                    {
+                        //被打断，料理后事，比如释放资源
+                        threadService.release();
+                        //结束循环
+                        break;
+                    }
+                    //没有被打断
+                    try
+                    {
+                        //睡眠
+                        Thread.sleep(intervals);
+                        //无异常，执行业务
+                        threadService.service();
+                    }
+                    catch (Exception e)
+                    {
+                        //有异常，设置打断标记
+                        currentThread.interrupt();
+                    }
+                }
+            }
+        }, threadName);
+        thread.start();
+        return thread;
+    }
+
+    /**
+     * 启动一个支持两阶段终止的线程，不需要调用start方法
+     *
+     * @param intervals     调用service方法的间隔时间，单位为毫秒
+     * @param threadService 业务
+     * @return Thread对象
+     */
+    public static Thread startThread(long intervals, ThreadService threadService)
+    {
+        Thread thread = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                while (true)
+                {
+                    Thread currentThread = Thread.currentThread();
+                    if (currentThread.isInterrupted())
+                    {
+                        //被打断，料理后事，比如释放资源
+                        threadService.release();
+                        //结束循环
+                        break;
+                    }
+                    //没有被打断
+                    try
+                    {
+                        //睡眠
+                        Thread.sleep(intervals);
+                        //无异常，执行业务
+                        threadService.service();
+                    }
+                    catch (Exception e)
+                    {
+                        //有异常，设置打断标记
+                        currentThread.interrupt();
+                    }
+                }
+            }
+        });
+        thread.start();
+        return thread;
+    }
+
+    /**
+     * 启动一个支持两阶段终止的线程，不需要调用start方法。间隔时间默认为1秒
+     *
+     * @param threadService 业务
+     * @return Thread对象
+     */
+    public static Thread startThread(ThreadService threadService)
+    {
+        Thread thread = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                while (true)
+                {
+                    Thread currentThread = Thread.currentThread();
+                    if (currentThread.isInterrupted())
+                    {
+                        //被打断，料理后事，比如释放资源
+                        threadService.release();
+                        //结束循环
+                        break;
+                    }
+                    //没有被打断
+                    try
+                    {
+                        //睡眠
+                        Thread.sleep(1000);
+                        //无异常，执行业务
+                        threadService.service();
+                    }
+                    catch (Exception e)
+                    {
+                        //有异常，设置打断标记
+                        currentThread.interrupt();
+                    }
+                }
+            }
+        });
+        thread.start();
+        return thread;
+    }
+}
+```
+
+
+
+```java
+package mao;
+
+
+/**
+ * Project name(项目名称)：java并发编程_两阶段终止
+ * Package(包名): mao
+ * Class(类名): Test2
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/8/27
+ * Time(创建时间)： 20:30
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test2
+{
+    public static int getIntRandom(int min, int max)
+    {
+        if (min > max)
+        {
+            min = max;
+        }
+        return min + (int) (Math.random() * (max - min + 1));
+    }
+
+
+    public static void main(String[] args) throws InterruptedException
+    {
+        Thread thread = T.startThread(500, new ThreadService()
+        {
+            @Override
+            public void service() throws Exception
+            {
+                System.out.println("----------------------------------");
+                Runtime r = Runtime.getRuntime();
+                float memory;
+                memory = r.totalMemory();
+                memory = memory / 1024 / 1024;
+                System.out.printf("JVM总内存：%.3fMB\n", memory);
+                memory = r.freeMemory();
+                memory = memory / 1024 / 1024;
+                System.out.printf(" 空闲内存：%.3fMB\n", memory);
+                memory = r.totalMemory() - r.freeMemory();
+                memory = memory / 1024 / 1024;
+                System.out.printf("已使用的内存：%.4fMB\n", memory);
+                System.out.println("----------------------------------");
+            }
+
+            @Override
+            public void release()
+            {
+                System.out.println("释放资源");
+            }
+        });
+
+        Thread.sleep(getIntRandom(2000, 3000));
+        thread.interrupt();
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+----------------------------------
+JVM总内存：256.000MB
+ 空闲内存：252.000MB
+已使用的内存：4.0000MB
+----------------------------------
+----------------------------------
+JVM总内存：256.000MB
+ 空闲内存：251.118MB
+已使用的内存：4.8821MB
+----------------------------------
+----------------------------------
+JVM总内存：256.000MB
+ 空闲内存：251.118MB
+已使用的内存：4.8821MB
+----------------------------------
+----------------------------------
+JVM总内存：256.000MB
+ 空闲内存：251.118MB
+已使用的内存：4.8821MB
+----------------------------------
+----------------------------------
+JVM总内存：256.000MB
+ 空闲内存：251.118MB
+已使用的内存：4.8821MB
+----------------------------------
+释放资源
+```
+
+
+
+
+
+## 守护线程
+
+默认情况下，Java 进程需要等待所有线程都运行结束才会结束。有一种特殊的线程叫做守护线程，只要其它非守护线程运行结束了，即使守护线程的代码没有执行完，也会强制结束
+
+
+
+如果需要设置成守护线程，则需要调用线程的setDaemon方法，设置成true
+
+
+
+
+
+## 五种状态
+
