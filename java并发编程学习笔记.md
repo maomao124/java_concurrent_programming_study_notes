@@ -1903,3 +1903,159 @@ JVM总内存：256.000MB
 
 ## 五种状态
 
+![image-20220827211631119](img/java并发编程学习笔记/image-20220827211631119.png)
+
+
+
+**这是从操作系统层面来描述的**
+
+
+
+* 【初始状态】仅是在语言层面创建了线程对象，还未与操作系统线程关联
+* 【可运行状态】（就绪状态）指该线程已经被创建（与操作系统线程关联），可以由 CPU 调度执行
+* 【运行状态】指获取了 CPU 时间片运行中的状态
+  * 当 CPU 时间片用完，会从【运行状态】转换至【可运行状态】，会导致线程的上下文切换
+* 【阻塞状态】
+  * 如果调用了阻塞 API，如 BIO 读写文件，这时该线程实际不会用到 CPU，会导致线程上下文切换，进入【阻塞状态】
+  * 等 BIO 操作完毕，会由操作系统唤醒阻塞的线程，转换至【可运行状态】
+  * 与【可运行状态】的区别是，对【阻塞状态】的线程来说只要它们一直不唤醒，调度器就一直不会考虑调度它们
+* 【终止状态】表示线程已经执行完毕，生命周期已经结束，不会再转换为其它状态
+
+
+
+
+
+## 六种状态
+
+
+
+![image-20220827211854901](img/java并发编程学习笔记/image-20220827211854901.png)
+
+
+
+
+
+**这是从 Java API 层面来描述的**
+
+
+
+* NEW： 线程刚被创建，但是还没有调用 start() 方法
+* RUNNABLE ：当调用了 start() 方法之后，注意，Java API 层面的 RUNNABLE 状态涵盖了 操作系统 层面的 【可运行状态】、【运行状态】和【阻塞状态】（由于 BIO 导致的线程阻塞，在 Java 里无法区分，仍然认为是可运行）
+* BLOCKED ， WAITING ， TIMED_WAITING 都是 Java API 层面对【阻塞状态】的细分
+* TERMINATED 当线程代码运行结束
+
+
+
+
+
+```java
+/**
+ * A thread state.  A thread can be in one of the following states:
+ * <ul>
+ * <li>{@link #NEW}<br>
+ *     A thread that has not yet started is in this state.
+ *     </li>
+ * <li>{@link #RUNNABLE}<br>
+ *     A thread executing in the Java virtual machine is in this state.
+ *     </li>
+ * <li>{@link #BLOCKED}<br>
+ *     A thread that is blocked waiting for a monitor lock
+ *     is in this state.
+ *     </li>
+ * <li>{@link #WAITING}<br>
+ *     A thread that is waiting indefinitely for another thread to
+ *     perform a particular action is in this state.
+ *     </li>
+ * <li>{@link #TIMED_WAITING}<br>
+ *     A thread that is waiting for another thread to perform an action
+ *     for up to a specified waiting time is in this state.
+ *     </li>
+ * <li>{@link #TERMINATED}<br>
+ *     A thread that has exited is in this state.
+ *     </li>
+ * </ul>
+ *
+ * <p>
+ * A thread can be in only one state at a given point in time.
+ * These states are virtual machine states which do not reflect
+ * any operating system thread states.
+ *
+ * @since   1.5
+ * @see #getState
+ */
+public enum State {
+    /**
+     * Thread state for a thread which has not yet started.
+     */
+    NEW,
+
+    /**
+     * Thread state for a runnable thread.  A thread in the runnable
+     * state is executing in the Java virtual machine but it may
+     * be waiting for other resources from the operating system
+     * such as processor.
+     */
+    RUNNABLE,
+
+    /**
+     * Thread state for a thread blocked waiting for a monitor lock.
+     * A thread in the blocked state is waiting for a monitor lock
+     * to enter a synchronized block/method or
+     * reenter a synchronized block/method after calling
+     * {@link Object#wait() Object.wait}.
+     */
+    BLOCKED,
+
+    /**
+     * Thread state for a waiting thread.
+     * A thread is in the waiting state due to calling one of the
+     * following methods:
+     * <ul>
+     *   <li>{@link Object#wait() Object.wait} with no timeout</li>
+     *   <li>{@link #join() Thread.join} with no timeout</li>
+     *   <li>{@link LockSupport#park() LockSupport.park}</li>
+     * </ul>
+     *
+     * <p>A thread in the waiting state is waiting for another thread to
+     * perform a particular action.
+     *
+     * For example, a thread that has called {@code Object.wait()}
+     * on an object is waiting for another thread to call
+     * {@code Object.notify()} or {@code Object.notifyAll()} on
+     * that object. A thread that has called {@code Thread.join()}
+     * is waiting for a specified thread to terminate.
+     */
+    WAITING,
+
+    /**
+     * Thread state for a waiting thread with a specified waiting time.
+     * A thread is in the timed waiting state due to calling one of
+     * the following methods with a specified positive waiting time:
+     * <ul>
+     *   <li>{@link #sleep Thread.sleep}</li>
+     *   <li>{@link Object#wait(long) Object.wait} with timeout</li>
+     *   <li>{@link #join(long) Thread.join} with timeout</li>
+     *   <li>{@link LockSupport#parkNanos LockSupport.parkNanos}</li>
+     *   <li>{@link LockSupport#parkUntil LockSupport.parkUntil}</li>
+     * </ul>
+     */
+    TIMED_WAITING,
+
+    /**
+     * Thread state for a terminated thread.
+     * The thread has completed execution.
+     */
+    TERMINATED;
+}
+```
+
+
+
+
+
+
+
+
+
+# 共享模型之管程
+
