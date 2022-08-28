@@ -3749,3 +3749,363 @@ class Number
 
 ## 变量的线程安全
 
+
+
+**成员变量和静态变量是否线程安全？**
+
+* 如果它们没有共享，则线程安全
+* 如果它们被共享了，根据它们的状态是否能够改变，又分两种情况
+  * 如果只有读操作，则线程安全
+  * 如果有读写操作，则这段代码是临界区，需要考虑线程安全
+
+
+
+**局部变量是否线程安全？**
+
+* 局部变量是线程安全的
+* 但局部变量引用的对象则未必
+  * 如果该对象没有逃离方法的作用范围，它是线程安全的
+  * 如果该对象逃离方法的作用范围，需要考虑线程安全
+
+
+
+```java
+public static void test1() 
+{
+    int i = 10;
+    i++;
+}
+```
+
+
+
+每个线程调用 test1() 方法时局部变量 i，会在每个线程的栈帧内存中被创建多份，因此不存在共享
+
+
+
+**局部变量引用的对象：**
+
+```java
+package mao.t1;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Project name(项目名称)：java并发编程_线程安全
+ * Package(包名): mao.t1
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/8/28
+ * Time(创建时间)： 13:18
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    private final List<Integer> list = new ArrayList<>();
+
+    public void method1(int loopNumber)
+    {
+        for (int i = 0; i < loopNumber; i++)
+        {
+            add();
+            sub();
+        }
+    }
+
+    private void add()
+    {
+        list.add(1);
+    }
+
+    private void sub()
+    {
+        list.remove(0);
+    }
+
+    public static void main(String[] args)
+    {
+        Test t = new Test();
+        Thread t1 = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                t.method1(500);
+            }
+        }, "t1");
+
+        Thread t2 = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                t.method1(500);
+            }
+        }, "t2");
+
+        t1.start();
+        t2.start();
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+Exception in thread "t2" java.lang.IndexOutOfBoundsException: Index 0 out of bounds for length 0
+	at java.base/jdk.internal.util.Preconditions.outOfBounds(Preconditions.java:64)
+	at java.base/jdk.internal.util.Preconditions.outOfBoundsCheckIndex(Preconditions.java:70)
+	at java.base/jdk.internal.util.Preconditions.checkIndex(Preconditions.java:266)
+	at java.base/java.util.Objects.checkIndex(Objects.java:359)
+	at java.base/java.util.ArrayList.remove(ArrayList.java:504)
+	at mao.t1.Test.sub(Test.java:39)
+	at mao.t1.Test.method1(Test.java:28)
+	at mao.t1.Test$2.run(Test.java:59)
+	at java.base/java.lang.Thread.run(Thread.java:831)
+```
+
+
+
+
+
+![image-20220828133730847](img/java并发编程学习笔记/image-20220828133730847.png)
+
+
+
+
+
+ThreadUnsafe则为Test类
+
+
+
+**将 list 修改为局部变量：**
+
+```java
+package mao.t2;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Project name(项目名称)：java并发编程_线程安全
+ * Package(包名): mao.t2
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/8/28
+ * Time(创建时间)： 13:40
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    public void method1(int loopNumber)
+    {
+        List<Integer> list = new ArrayList<>();
+        for (int i = 0; i < loopNumber; i++)
+        {
+            add(list);
+            sub(list);
+        }
+    }
+
+    private void add(List<Integer> list)
+    {
+        list.add(1);
+    }
+
+    private void sub(List<Integer> list)
+    {
+        list.remove(0);
+    }
+
+    public static void main(String[] args)
+    {
+        Test t = new Test();
+        Thread t1 = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                t.method1(500);
+            }
+        }, "t1");
+
+        Thread t2 = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                t.method1(500);
+            }
+        }, "t2");
+
+        t1.start();
+        t2.start();
+    }
+}
+```
+
+
+
+* list 是局部变量，每个线程调用时会创建其不同实例，没有共享
+* 而 add的参数是从 method1 中传递过来的，与 method1 中引用同一个对象
+* sub的参数分析与 method2 相同
+
+
+
+![image-20220828134351257](img/java并发编程学习笔记/image-20220828134351257.png)
+
+
+
+
+
+
+
+如果把 method2 和 method3 的方法修改为 public 会不会代理线程安全问题？
+
+* 情况1：有其它线程调用 add和 sub
+* 情况2：在 情况1 的基础上，为 Test类添加子类，子类覆盖 add或 sub方法
+
+
+
+```java
+package mao.t3;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Project name(项目名称)：java并发编程_线程安全
+ * Package(包名): mao.t3
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/8/28
+ * Time(创建时间)： 13:46
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    public void method1(int loopNumber)
+    {
+        List<Integer> list = new ArrayList<>();
+        for (int i = 0; i < loopNumber; i++)
+        {
+            add(list);
+            sub(list);
+        }
+    }
+
+    public void add(List<Integer> list)
+    {
+        list.add(1);
+    }
+
+    public void sub(List<Integer> list)
+    {
+        list.remove(0);
+    }
+
+    public static void main(String[] args)
+    {
+        Test t = new Test();
+        Thread t1 = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                t.method1(500);
+            }
+        }, "t1");
+
+        Thread t2 = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                t.method1(500);
+            }
+        }, "t2");
+
+        t1.start();
+        t2.start();
+    }
+}
+
+class Test2 extends Test
+{
+    @Override
+    public void sub(List<Integer> list)
+    {
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                list.remove(0);
+            }
+        }).start();
+    }
+
+    public static void main(String[] args)
+    {
+        Test2 t = new Test2();
+        Thread t1 = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                t.method1(500);
+            }
+        }, "t1");
+
+        Thread t2 = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                t.method1(500);
+            }
+        }, "t2");
+
+        t1.start();
+        t2.start();
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+Exception in thread "Thread-951" java.lang.IndexOutOfBoundsException: Index 0 out of bounds for length 0
+	at java.base/jdk.internal.util.Preconditions.outOfBounds(Preconditions.java:64)
+	at java.base/jdk.internal.util.Preconditions.outOfBoundsCheckIndex(Preconditions.java:70)
+	at java.base/jdk.internal.util.Preconditions.checkIndex(Preconditions.java:266)
+	at java.base/java.util.Objects.checkIndex(Objects.java:359)
+	at java.base/java.util.ArrayList.remove(ArrayList.java:504)
+	at mao.t3.Test2$1.run(Test.java:77)
+	at java.base/java.lang.Thread.run(Thread.java:831)
+```
+
+
+
+
+
+
+
+## 常见线程安全类
