@@ -3348,5 +3348,404 @@ class Number
 
 ### 情况五
 
+```java
+package mao.t5;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Project name(项目名称)：java并发编程_线程八锁
+ * Package(包名): mao.t5
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/8/28
+ * Time(创建时间)： 12:29
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args)
+    {
+        log.info("开始");
+       Number n = new Number();
+        Thread t1 = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                Number.a();
+            }
+        }, "t1");
+
+        Thread t2 = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                n.b();
+            }
+        }, "t2");
+
+
+        t1.start();
+        t2.start();
+    }
+}
+
+class Number
+{
+    private static final Logger log = LoggerFactory.getLogger(Number.class);
+
+    public static synchronized void a()
+    {
+        try
+        {
+            Thread.sleep(1000);
+        }
+        catch (InterruptedException e)
+        {
+            e.printStackTrace();
+        }
+        log.debug("1");
+    }
+
+    public synchronized void b()
+    {
+        log.debug("2");
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-08-28  12:31:57.157  [main] INFO  mao.t5.Test:  开始
+2022-08-28  12:31:57.161  [t2] DEBUG mao.t5.Number:  2
+2022-08-28  12:31:58.163  [t1] DEBUG mao.t5.Number:  1
+```
+
+
+
+* 开始打印2，1秒后打印1
+
+
+
+
+
+### 情况六
+
+```java
+package mao.t6;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Project name(项目名称)：java并发编程_线程八锁
+ * Package(包名): mao.t6
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/8/28
+ * Time(创建时间)： 12:33
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args)
+    {
+        log.info("开始");
+        Thread t1 = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                Number.a();
+            }
+        }, "t1");
+
+        Thread t2 = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                Number.b();
+            }
+        }, "t2");
+
+
+        t1.start();
+        t2.start();
+    }
+}
+
+class Number
+{
+    private static final Logger log = LoggerFactory.getLogger(Number.class);
+
+    public static synchronized void a()
+    {
+        try
+        {
+            Thread.sleep(1000);
+        }
+        catch (InterruptedException e)
+        {
+            e.printStackTrace();
+        }
+        log.debug("1");
+    }
+
+    public static synchronized void b()
+    {
+        log.debug("2");
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-08-28  12:34:55.050  [main] INFO  mao.t6.Test:  开始
+2022-08-28  12:34:56.065  [t1] DEBUG mao.t6.Number:  1
+2022-08-28  12:34:56.065  [t2] DEBUG mao.t6.Number:  2
+```
+
+```sh
+2022-08-28  12:35:31.238  [main] INFO  mao.t6.Test:  开始
+2022-08-28  12:35:31.242  [t2] DEBUG mao.t6.Number:  2
+2022-08-28  12:35:32.247  [t1] DEBUG mao.t6.Number:  1
+```
+
+
+
+* 开始后，过1秒，打印1和2
+* 开始后先打印2，过1秒再打印1
+
+
+
+
+
+### 情况七
+
+```java
+package mao.t7;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Project name(项目名称)：java并发编程_线程八锁
+ * Package(包名): mao.t7
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/8/28
+ * Time(创建时间)： 12:37
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args)
+    {
+        log.info("开始");
+        Number n1 = new Number();
+        Number n2 = new Number();
+        Thread t1 = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                n1.a();
+            }
+        }, "t1");
+
+        Thread t2 = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                n2.b();
+            }
+        }, "t2");
+
+
+        t1.start();
+        t2.start();
+    }
+}
+
+class Number
+{
+    private static final Logger log = LoggerFactory.getLogger(Number.class);
+
+    public static synchronized void a()
+    {
+        try
+        {
+            Thread.sleep(1000);
+        }
+        catch (InterruptedException e)
+        {
+            e.printStackTrace();
+        }
+        log.debug("1");
+    }
+
+    public synchronized void b()
+    {
+        log.debug("2");
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-08-28  12:39:07.774  [main] INFO  mao.t7.Test:  开始
+2022-08-28  12:39:07.778  [t2] DEBUG mao.t7.Number:  2
+2022-08-28  12:39:08.781  [t1] DEBUG mao.t7.Number:  1
+```
+
+
+
+* 开始后先打印2，1秒后再打印1
+
+
+
+
+
+### 情况八
+
+```java
+package mao.t8;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Project name(项目名称)：java并发编程_线程八锁
+ * Package(包名): mao.t8
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/8/28
+ * Time(创建时间)： 12:40
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+
+@SuppressWarnings("all")
+public class Test
+{
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args)
+    {
+        log.info("开始");
+        Number n1 = new Number();
+        Number n2 = new Number();
+        Thread t1 = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                n1.a();
+            }
+        }, "t1");
+
+        Thread t2 = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                n2.b();
+            }
+        }, "t2");
+
+
+        t1.start();
+        t2.start();
+    }
+}
+
+class Number
+{
+    private static final Logger log = LoggerFactory.getLogger(Number.class);
+
+    public static synchronized void a()
+    {
+        try
+        {
+            Thread.sleep(1000);
+        }
+        catch (InterruptedException e)
+        {
+            e.printStackTrace();
+        }
+        log.debug("1");
+    }
+
+    public static synchronized void b()
+    {
+        log.debug("2");
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-08-28  12:43:04.928  [main] INFO  mao.t8.Test:  开始
+2022-08-28  12:43:05.933  [t1] DEBUG mao.t8.Number:  1
+2022-08-28  12:43:05.933  [t2] DEBUG mao.t8.Number:  2
+```
+
+```sh
+2022-08-28  12:43:40.942  [main] INFO  mao.t8.Test:  开始
+2022-08-28  12:43:40.946  [t2] DEBUG mao.t8.Number:  2
+2022-08-28  12:43:41.952  [t1] DEBUG mao.t8.Number:  1
+```
+
+
+
+
+
+* 1秒后打印1然后再打印2
+* 开始立马打印2，1秒后再打印1
+
+
+
+
+
+
+
+## 变量的线程安全
 
