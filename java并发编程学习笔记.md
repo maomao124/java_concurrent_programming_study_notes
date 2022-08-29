@@ -4367,3 +4367,557 @@ public class Test
 
 
 
+
+
+## 卖票问题
+
+
+
+```java
+package mao.t6;
+
+/**
+ * Project name(项目名称)：java并发编程_线程安全
+ * Package(包名): mao.t6
+ * Class(类名): TicketWindow
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/8/29
+ * Time(创建时间)： 20:18
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class TicketWindow
+{
+    private int count;
+
+    public TicketWindow(int count)
+    {
+        this.count = count;
+    }
+
+    public int getCount()
+    {
+        return count;
+    }
+
+    public int sell(int amount)
+    {
+        if (this.count >= amount)
+        {
+            this.count -= amount;
+            return amount;
+        }
+        else
+        {
+            return 0;
+        }
+    }
+}
+```
+
+
+
+```java
+package mao.t6;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
+import java.util.Vector;
+
+/**
+ * Project name(项目名称)：java并发编程_线程安全
+ * Package(包名): mao.t6
+ * Class(类名): ExerciseSell
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/8/29
+ * Time(创建时间)： 20:19
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class ExerciseSell
+{
+    public static void main(String[] args)
+    {
+        TicketWindow ticketWindow = new TicketWindow(20000);
+        List<Thread> list = new ArrayList<>();
+        List<Integer> sellCount = new Vector<>();
+        for (int i = 0; i < 10000; i++)
+        {
+            Thread t = new Thread(() ->
+            {
+                int count = ticketWindow.sell(randomAmount());
+                sellCount.add(count);
+            });
+            list.add(t);
+        }
+
+        for (Thread thread : list)
+        {
+            thread.start();
+        }
+
+        list.forEach((t) ->
+        {
+            try
+            {
+                t.join();
+            }
+            catch (InterruptedException e)
+            {
+                e.printStackTrace();
+            }
+        });
+        System.out.println("卖出去的票总数：" + sellCount.stream().mapToInt(c -> c).sum());
+        System.out.println("剩余票数：" + ticketWindow.getCount());
+    }
+
+    // Random 为线程安全
+    static Random random = new Random();
+
+    // 随机 1~5
+    public static int randomAmount()
+    {
+        return random.nextInt(5) + 1;
+    }
+
+}
+```
+
+
+
+```java
+package mao.t6;
+
+/**
+ * Project name(项目名称)：java并发编程_线程安全
+ * Package(包名): mao.t6
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/8/29
+ * Time(创建时间)： 20:28
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    public static void main(String[] args)
+    {
+        for (int i = 0; i < 10; i++)
+        {
+            ExerciseSell.main(null);
+        }
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+卖出去的票总数：20006
+剩余票数：0
+```
+
+
+
+解决：
+
+加锁
+
+```java
+package mao.t6;
+
+/**
+ * Project name(项目名称)：java并发编程_线程安全
+ * Package(包名): mao.t6
+ * Class(类名): TicketWindow
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/8/29
+ * Time(创建时间)： 20:18
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class TicketWindow
+{
+    private int count;
+
+    public TicketWindow(int count)
+    {
+        this.count = count;
+    }
+
+    public int getCount()
+    {
+        return count;
+    }
+
+    public synchronized int sell(int amount)
+    {
+        if (this.count >= amount)
+        {
+            this.count -= amount;
+            return amount;
+        }
+        else
+        {
+            return 0;
+        }
+    }
+}
+```
+
+
+
+
+
+## 转账问题
+
+```java
+package mao.t7;
+
+/**
+ * Project name(项目名称)：java并发编程_线程安全
+ * Package(包名): mao.t7
+ * Class(类名): Account
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/8/29
+ * Time(创建时间)： 20:36
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Account
+{
+    private int money;
+
+    public Account(int money)
+    {
+        this.money = money;
+    }
+
+    public int getMoney()
+    {
+        return money;
+    }
+
+    public void setMoney(int money)
+    {
+        this.money = money;
+    }
+
+    /**
+     * 转账
+     *
+     * @param target 对方的账户
+     * @param amount 要转账的金额
+     */
+    public void transfer(Account target, int amount)
+    {
+        if (this.money > amount)
+        {
+            this.setMoney(this.getMoney() - amount);
+            target.setMoney(target.getMoney() + amount);
+        }
+    }
+
+}
+```
+
+
+
+```java
+package mao.t7;
+
+import java.util.Random;
+
+/**
+ * Project name(项目名称)：java并发编程_线程安全
+ * Package(包名): mao.t7
+ * Class(类名): ExerciseTransfer
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/8/29
+ * Time(创建时间)： 20:37
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class ExerciseTransfer
+{
+    public static void main(String[] args) throws InterruptedException
+    {
+        Account a = new Account(1000);
+        Account b = new Account(1000);
+
+        Thread t1 = new Thread(() ->
+        {
+            for (int i = 0; i < 1000; i++)
+            {
+                a.transfer(b, randomAmount());
+            }
+        }, "t1");
+
+        Thread t2 = new Thread(() ->
+        {
+            for (int i = 0; i < 1000; i++)
+            {
+                b.transfer(a, randomAmount());
+            }
+        }, "t2");
+
+        t1.start();
+        t2.start();
+
+        t1.join();
+        t2.join();
+
+        // 查看转账2000次后的总金额
+        System.out.println("转账后双方的总金额:" + (a.getMoney() + b.getMoney()));
+    }
+
+    // Random 为线程安全
+    static Random random = new Random();
+
+    // 随机 1~100
+    public static int randomAmount()
+    {
+        return random.nextInt(100) + 1;
+    }
+}
+```
+
+
+
+```java
+package mao.t7;
+
+/**
+ * Project name(项目名称)：java并发编程_线程安全
+ * Package(包名): mao.t7
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/8/29
+ * Time(创建时间)： 20:39
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    public static void main(String[] args) throws InterruptedException
+    {
+        for (int i = 0; i < 10; i++)
+        {
+            ExerciseTransfer.main(null);
+        }
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+转账后双方的总金额:5271
+转账后双方的总金额:4157
+转账后双方的总金额:147
+转账后双方的总金额:4125
+转账后双方的总金额:6143
+转账后双方的总金额:1883
+转账后双方的总金额:48
+转账后双方的总金额:1507
+转账后双方的总金额:2000
+转账后双方的总金额:2000
+```
+
+
+
+存在线程安全问题
+
+
+
+加上锁住this对象：
+
+```java
+package mao.t7;
+
+/**
+ * Project name(项目名称)：java并发编程_线程安全
+ * Package(包名): mao.t7
+ * Class(类名): Account
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/8/29
+ * Time(创建时间)： 20:36
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Account
+{
+    private int money;
+
+    public Account(int money)
+    {
+        this.money = money;
+    }
+
+    public int getMoney()
+    {
+        return money;
+    }
+
+    public void setMoney(int money)
+    {
+        this.money = money;
+    }
+
+    /**
+     * 转账
+     *
+     * @param target 对方的账户
+     * @param amount 要转账的金额
+     */
+    public synchronized void transfer(Account target, int amount)
+    {
+        if (this.money > amount)
+        {
+            this.setMoney(this.getMoney() - amount);
+            target.setMoney(target.getMoney() + amount);
+        }
+    }
+
+}
+```
+
+
+
+运行结果：
+
+```sh
+转账后双方的总金额:4434
+转账后双方的总金额:4963
+转账后双方的总金额:2239
+转账后双方的总金额:2375
+转账后双方的总金额:2350
+转账后双方的总金额:771
+转账后双方的总金额:1547
+转账后双方的总金额:2000
+转账后双方的总金额:2000
+转账后双方的总金额:2289
+```
+
+
+
+也有线程安全问题
+
+因为当前方法操作了this和target两个Account类的对象
+
+
+
+需要锁住类的字节码
+
+
+
+```java
+package mao.t7;
+
+/**
+ * Project name(项目名称)：java并发编程_线程安全
+ * Package(包名): mao.t7
+ * Class(类名): Account
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/8/29
+ * Time(创建时间)： 20:36
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Account
+{
+    private int money;
+
+    public Account(int money)
+    {
+        this.money = money;
+    }
+
+    public int getMoney()
+    {
+        return money;
+    }
+
+    public void setMoney(int money)
+    {
+        this.money = money;
+    }
+
+    /**
+     * 转账
+     *
+     * @param target 对方的账户
+     * @param amount 要转账的金额
+     */
+    public void transfer(Account target, int amount)
+    {
+        synchronized (Account.class)
+        {
+            if (this.money > amount)
+            {
+                this.setMoney(this.getMoney() - amount);
+                target.setMoney(target.getMoney() + amount);
+            }
+        }
+    }
+
+}
+```
+
+
+
+运行结果：
+
+```sh
+转账后双方的总金额:2000
+转账后双方的总金额:2000
+转账后双方的总金额:2000
+转账后双方的总金额:2000
+转账后双方的总金额:2000
+转账后双方的总金额:2000
+转账后双方的总金额:2000
+转账后双方的总金额:2000
+转账后双方的总金额:2000
+转账后双方的总金额:2000
+```
+
+
+
+
+
+
+
+## Monitor
+
