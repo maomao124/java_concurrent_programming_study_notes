@@ -4109,3 +4109,261 @@ Exception in thread "Thread-951" java.lang.IndexOutOfBoundsException: Index 0 ou
 
 
 ## 常见线程安全类
+
+* String
+* Integer
+* StringBuffer
+* Random
+* Vector
+* Hashtable
+* java.util.concurrent 包下的类
+
+
+
+![image-20220828135912826](img/java并发编程学习笔记/image-20220828135912826.png)
+
+
+
+
+
+这里说它们是线程安全的是指，多个线程调用它们同一个实例的某个方法时，是线程安全的
+
+* 它们的每个方法是原子的
+* 但是它们多个方法的组合不是原子的
+
+
+
+```java
+package mao.t4;
+
+import java.util.Hashtable;
+
+/**
+ * Project name(项目名称)：java并发编程_线程安全
+ * Package(包名): mao.t4
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/8/29
+ * Time(创建时间)： 19:54
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    private static final Hashtable<String, String> hashtable = new Hashtable<>();
+
+    public static void m(String value)
+    {
+        if (hashtable.get("key") == null)
+        {
+            hashtable.put("key", value);
+            System.out.println("put "+value);
+        }
+    }
+
+    public static void main(String[] args)
+    {
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                m("v1");
+            }
+        }, "t1").start();
+
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                m("v2");
+            }
+        }, "t2").start();
+    }
+}
+
+```
+
+
+
+![image-20220829200214428](img/java并发编程学习笔记/image-20220829200214428.png)
+
+
+
+
+
+
+
+## 不可变类线程安全性
+
+String、Integer 等都是不可变类，因为其内部的状态不可以改变，因此它们的方法都是线程安全的
+
+
+
+```java
+public final class String
+    implements java.io.Serializable, Comparable<String>, CharSequence,
+               Constable, ConstantDesc {
+
+    /**
+     * The value is used for character storage.
+     *
+     * @implNote This field is trusted by the VM, and is a subject to
+     * constant folding if String instance is constant. Overwriting this
+     * field after construction will cause problems.
+     *
+     * Additionally, it is marked with {@link Stable} to trust the contents
+     * of the array. No other facility in JDK provides this functionality (yet).
+     * {@link Stable} is safe here, because value is never null.
+     */
+    @Stable
+    private final byte[] value;
+
+    /**
+     * The identifier of the encoding used to encode the bytes in
+     * {@code value}. The supported values in this implementation are
+     *
+     * LATIN1
+     * UTF16
+     *
+     * @implNote This field is trusted by the VM, and is a subject to
+     * constant folding if String instance is constant. Overwriting this
+     * field after construction will cause problems.
+     */
+    private final byte coder;
+
+    /** Cache the hash code for the string */
+    private int hash; // Default to 0
+
+    /**
+     * Cache if the hash has been calculated as actually being zero, enabling
+     * us to avoid recalculating this.
+     */
+    private boolean hashIsZero; // Default to false;
+                   
+...
+
+    /**
+     * Returns a string that is a substring of this string. The
+     * substring begins at the specified {@code beginIndex} and
+     * extends to the character at index {@code endIndex - 1}.
+     * Thus the length of the substring is {@code endIndex-beginIndex}.
+     * <p>
+     * Examples:
+     * <blockquote><pre>
+     * "hamburger".substring(4, 8) returns "urge"
+     * "smiles".substring(1, 5) returns "mile"
+     * </pre></blockquote>
+     *
+     * @param      beginIndex   the beginning index, inclusive.
+     * @param      endIndex     the ending index, exclusive.
+     * @return     the specified substring.
+     * @throws     IndexOutOfBoundsException  if the
+     *             {@code beginIndex} is negative, or
+     *             {@code endIndex} is larger than the length of
+     *             this {@code String} object, or
+     *             {@code beginIndex} is larger than
+     *             {@code endIndex}.
+     */
+    public String substring(int beginIndex, int endIndex) {
+        int length = length();
+        checkBoundsBeginEnd(beginIndex, endIndex, length);
+        if (beginIndex == 0 && endIndex == length) {
+            return this;
+        }
+        int subLen = endIndex - beginIndex;
+        return isLatin1() ? StringLatin1.newString(value, beginIndex, subLen)
+                          : StringUTF16.newString(value, beginIndex, subLen);
+    }
+}
+```
+
+
+
+
+
+例子：
+
+```java
+package mao.t5;
+
+/**
+ * Project name(项目名称)：java并发编程_线程安全
+ * Package(包名): mao.t5
+ * Class(类名): Int
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/8/29
+ * Time(创建时间)： 20:11
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Int
+{
+    private int value = 0;
+
+    public Int(int value)
+    {
+        this.value = value;
+    }
+
+    public int getValue()
+    {
+        return this.value;
+    }
+
+    @Override
+    public String toString()
+    {
+        return String.valueOf(value);
+    }
+
+    public Int add(int v)
+    {
+        return new Int(value + v);
+    }
+
+    public Int sub(int v)
+    {
+        return new Int(value - v);
+    }
+}
+
+```
+
+
+
+```java
+package mao.t5;
+
+/**
+ * Project name(项目名称)：java并发编程_线程安全
+ * Package(包名): mao.t5
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/8/29
+ * Time(创建时间)： 20:14
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    public static void main(String[] args)
+    {
+        System.out.println(new Int(2));
+        System.out.println(new Int(6).add(5));
+    }
+}
+```
+
+
+
