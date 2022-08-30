@@ -4999,4 +4999,92 @@ Monitor 结构：
 
 
 
+
+
 ## synchronized 原理
+
+### 轻量级锁
+
+轻量级锁的使用场景：如果一个对象虽然有多线程要加锁，但加锁的时间是错开的（也就是没有竞争），那么可以 使用轻量级锁来优化。
+
+轻量级锁对使用者是透明的，即语法仍然是 synchronized
+
+
+
+假设有两个方法同步块，利用同一个对象加锁：
+
+```java
+static final Object obj = new Object();
+public static void method1() 
+{
+ synchronized( obj ) 
+ {
+ // 同步块 A
+ method2();
+ }
+}
+public static void method2() 
+{
+ synchronized( obj ) 
+ {
+ // 同步块 B
+ }
+}
+```
+
+
+
+创建锁记录（Lock Record）对象，每个线程都的栈帧都会包含一个锁记录的结构，内部可以存储锁定对象的 Mark Word
+
+
+
+![image-20220830211536104](img/java并发编程学习笔记/image-20220830211536104.png)
+
+
+
+让锁记录中 Object reference 指向锁对象，并尝试用 cas 替换 Object 的 Mark Word，将 Mark Word 的值存入锁记录
+
+
+
+![image-20220830211623427](img/java并发编程学习笔记/image-20220830211623427.png)
+
+
+
+如果 cas 替换成功，对象头中存储了锁记录地址和状态 00 ，表示由该线程给对象加锁
+
+
+
+![image-20220830211811180](img/java并发编程学习笔记/image-20220830211811180.png)
+
+
+
+如果 cas 失败，有两种情况
+
+* 如果是其它线程已经持有了该 Object 的轻量级锁，这时表明有竞争，进入锁膨胀过程
+* 如果是自己执行了 synchronized 锁重入，那么再添加一条 Lock Record 作为重入的计数
+
+
+
+![image-20220830211913699](img/java并发编程学习笔记/image-20220830211913699.png)
+
+
+
+当退出 synchronized 代码块（解锁时）如果有取值为 null 的锁记录，表示有重入，这时重置锁记录，表示重入计数减一
+
+
+
+![image-20220830211941686](img/java并发编程学习笔记/image-20220830211941686.png)
+
+
+
+当退出 synchronized 代码块（解锁时）锁记录的值不为 null，这时使用 cas 将 Mark Word 的值恢复给对象头
+
+* 成功，则解锁成功
+* 失败，说明轻量级锁进行了锁膨胀或已经升级为重量级锁，进入重量级锁解锁流程
+
+
+
+
+
+### 锁膨胀
+
