@@ -5088,7 +5088,7 @@ public static void method2()
 
 ### 锁膨胀
 
-如果在尝试加轻量级锁的过程中，CAS 操作无法成功，这时一种情况就是有其它线程为此对象加上了轻量级锁（有 竞争），这时需要进行锁膨胀，将轻量级锁变为重量级锁
+如果在尝试加轻量级锁的过程中，CAS 操作无法成功，这时一种情况就是有其它线程为此对象加上了轻量级锁（有竞争），这时需要进行锁膨胀，将轻量级锁变为重量级锁
 
 
 
@@ -5134,4 +5134,59 @@ public static void method2()
 
 
 ### 偏向锁
+
+轻量级锁在没有竞争时（就自己这个线程），每次重入仍然需要执行 CAS 操作
+
+Java 6 中引入了偏向锁来做进一步优化：只有第一次使用 CAS 将线程 ID 设置到对象的 Mark Word 头，之后发现 这个线程 ID 是自己的就表示没有竞争，不用重新 CAS。以后只要不发生竞争，这个对象就归该线程所有
+
+
+
+```java
+static final Object obj = new Object();
+public static void m1() 
+{
+ synchronized( obj ) 
+ {
+ // 同步块 A
+ m2();
+ }
+}
+public static void m2() 
+{
+ synchronized( obj ) 
+ {
+ // 同步块 B
+ m3();
+ }
+}
+public static void m3() 
+{
+ synchronized( obj ) 
+ {
+    // 同步块 C
+ }
+}
+```
+
+
+
+
+
+![image-20220831205511909](img/java并发编程学习笔记/image-20220831205511909.png)
+
+
+
+![image-20220831205524485](img/java并发编程学习笔记/image-20220831205524485.png)
+
+
+
+一个对象创建时：
+
+* 如果开启了偏向锁（默认开启），那么对象创建后，markword 值为 0x05 即最后 3 位为 101，这时它的 thread、epoch、age 都为 0
+* 偏向锁是默认是延迟的，不会在程序启动时立即生效，如果想避免延迟，可以加 VM 参数 -XX:BiasedLockingStartupDelay=0 来禁用延迟
+* 如果没有开启偏向锁，那么对象创建后，markword 值为 0x01 即最后 3 位为 001，这时它的 hashcode、 age 都为 0，第一次用到 hashcode 时才会赋值
+
+
+
+
 
