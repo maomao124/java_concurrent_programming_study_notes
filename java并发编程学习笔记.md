@@ -5190,3 +5190,156 @@ public static void m3()
 
 
 
+添加依赖：
+
+```xml
+        <dependency>
+            <groupId>org.openjdk.jol</groupId>
+            <artifactId>jol-core</artifactId>
+            <version>0.16</version>
+        </dependency>
+```
+
+
+
+
+
+ 测试偏向锁：
+
+```java
+package mao.t1;
+
+
+import org.openjdk.jol.info.ClassLayout;
+
+/**
+ * Project name(项目名称)：java并发编程_synchronized原理
+ * Package(包名): mao.t1
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/8/31
+ * Time(创建时间)： 21:27
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+
+    public static void main(String[] args) throws InterruptedException
+    {
+        Lock lock = new Lock();
+        ClassLayout classLayout = ClassLayout.parseInstance(lock);
+
+        System.out.println(classLayout.toPrintable());
+
+        new Thread(() ->
+        {
+            System.out.println("synchronized 前");
+            System.out.println(classLayout.toPrintable());
+            synchronized (lock)
+            {
+                System.out.println("synchronized 中");
+                System.out.println(classLayout.toPrintable());
+            }
+            System.out.println("synchronized 后");
+            System.out.println(classLayout.toPrintable());
+        }, "t1").start();
+    }
+
+}
+
+class Lock
+{
+
+}
+```
+
+
+
+运行结果：
+
+```sh
+mao.t1.Lock object internals:
+OFF  SZ   TYPE DESCRIPTION               VALUE
+  0   8        (object header: mark)     0x0000000000000001 (non-biasable; age: 0)
+  8   4        (object header: class)    0x00180240
+ 12   4        (object alignment gap)    
+Instance size: 16 bytes
+Space losses: 0 bytes internal + 4 bytes external = 4 bytes total
+
+synchronized 前
+mao.t1.Lock object internals:
+OFF  SZ   TYPE DESCRIPTION               VALUE
+  0   8        (object header: mark)     0x0000000000000001 (non-biasable; age: 0)
+  8   4        (object header: class)    0x00180240
+ 12   4        (object alignment gap)    
+Instance size: 16 bytes
+Space losses: 0 bytes internal + 4 bytes external = 4 bytes total
+
+synchronized 中
+mao.t1.Lock object internals:
+OFF  SZ   TYPE DESCRIPTION               VALUE
+  0   8        (object header: mark)     0x000000f734bff150 (thin lock: 0x000000f734bff150)
+  8   4        (object header: class)    0x00180240
+ 12   4        (object alignment gap)    
+Instance size: 16 bytes
+Space losses: 0 bytes internal + 4 bytes external = 4 bytes total
+
+synchronized 后
+mao.t1.Lock object internals:
+OFF  SZ   TYPE DESCRIPTION               VALUE
+  0   8        (object header: mark)     0x0000000000000001 (non-biasable; age: 0)
+  8   4        (object header: class)    0x00180240
+ 12   4        (object alignment gap)    
+Instance size: 16 bytes
+Space losses: 0 bytes internal + 4 bytes external = 4 bytes total
+```
+
+
+
+
+
+### 撤销 - 调用对象 hashCode
+
+调用了对象的 hashCode，但偏向锁的对象 MarkWord 中存储的是线程 id，如果调用 hashCode 会导致偏向锁被撤销
+
+* 轻量级锁会在锁记录中记录 hashCode
+* 重量级锁会在 Monitor 中记录 hashCode
+
+
+
+
+
+### 撤销 - 其它线程使用对象
+
+当有其它线程使用偏向锁对象时，会将偏向锁升级为轻量级锁
+
+
+
+
+
+### 批量重偏向
+
+如果对象虽然被多个线程访问，但没有竞争，这时偏向了线程 T1 的对象仍有机会重新偏向 T2，重偏向会重置对象 的 Thread ID
+
+当撤销偏向锁阈值超过 20 次后，jvm 会这样觉得，我是不是偏向错了呢，于是会在给这些对象加锁时重新偏向至加锁线程
+
+
+
+
+
+### 批量撤销
+
+当撤销偏向锁阈值超过 40 次后，jvm 会这样觉得，自己确实偏向错了，根本就不该偏向。于是整个类的所有对象 都会变为不可偏向的，新建的对象也是不可偏向的
+
+
+
+
+
+
+
+## wait notify
+
