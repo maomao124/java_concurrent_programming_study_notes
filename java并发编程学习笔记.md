@@ -5605,3 +5605,349 @@ public class Object {
 
 ### 使用
 
+notify唤醒一个
+
+```java
+package mao.t1;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Project name(项目名称)：java并发编程_wait_notify
+ * Package(包名): mao.t1
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/1
+ * Time(创建时间)： 20:18
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 锁
+     */
+    private final static Object lock = new Object();
+
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+    
+    
+    public static void main(String[] args) throws InterruptedException
+    {
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                synchronized (lock)
+                {
+                    log.debug("执行t1....");
+                    try
+                    {
+                        //等待
+                        lock.wait();
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                    log.debug("t1被唤醒....");
+                }
+            }
+        }, "t1").start();
+
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                synchronized (lock)
+                {
+                    log.debug("执行t2....");
+                    try
+                    {
+                        lock.wait();
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                    log.debug("t2被唤醒....");
+                }
+            }
+        }, "t2").start();
+
+
+        Thread.sleep(300);
+        log.debug("唤醒 obj 上其它线程");
+        synchronized (lock)
+        {
+            //唤醒
+            lock.notify();
+        }
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-01  20:26:59.527  [t1] DEBUG mao.t1.Test:  执行t1....
+2022-09-01  20:26:59.529  [t2] DEBUG mao.t1.Test:  执行t2....
+2022-09-01  20:26:59.837  [main] DEBUG mao.t1.Test:  唤醒 obj 上其它线程
+2022-09-01  20:26:59.837  [t1] DEBUG mao.t1.Test:  t1被唤醒....
+```
+
+
+
+
+
+notifyAll唤醒全部：
+
+```java
+package mao.t2;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Project name(项目名称)：java并发编程_wait_notify
+ * Package(包名): mao.t2
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/1
+ * Time(创建时间)： 20:27
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 锁
+     */
+    private final static Object lock = new Object();
+
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+
+    public static void main(String[] args) throws InterruptedException
+    {
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                synchronized (lock)
+                {
+                    log.debug("执行t1....");
+                    try
+                    {
+                        //等待
+                        lock.wait();
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                    log.debug("t1被唤醒....");
+                }
+            }
+        }, "t1").start();
+
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                synchronized (lock)
+                {
+                    log.debug("执行t2....");
+                    try
+                    {
+                        lock.wait();
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                    log.debug("t2被唤醒....");
+                }
+            }
+        }, "t2").start();
+
+
+        Thread.sleep(300);
+        log.debug("唤醒 obj 上其它线程");
+        synchronized (lock)
+        {
+            //唤醒全部
+            lock.notifyAll();
+        }
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-01  20:28:32.332  [t1] DEBUG mao.t2.Test:  执行t1....
+2022-09-01  20:28:32.334  [t2] DEBUG mao.t2.Test:  执行t2....
+2022-09-01  20:28:32.637  [main] DEBUG mao.t2.Test:  唤醒 obj 上其它线程
+2022-09-01  20:28:32.637  [t1] DEBUG mao.t2.Test:  t1被唤醒....
+2022-09-01  20:28:32.637  [t2] DEBUG mao.t2.Test:  t2被唤醒....
+```
+
+
+
+wait() 方法会释放对象的锁，进入 WaitSet 等待区，从而让其他线程就机会获取对象的锁。无限制等待，直到 notify 为止
+
+wait(long n) 有时限的等待, 到 n 毫秒后结束等待，或是被 notify
+
+
+
+```java
+package mao.t3;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Project name(项目名称)：java并发编程_wait_notify
+ * Package(包名): mao.t3
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/1
+ * Time(创建时间)： 20:30
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 锁
+     */
+    private final static Object lock = new Object();
+
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+
+    public static void main(String[] args) throws InterruptedException
+    {
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                synchronized (lock)
+                {
+                    log.debug("执行t1....");
+                    try
+                    {
+                        //等待
+                        lock.wait(500);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                    log.debug("t1被唤醒....");
+                }
+            }
+        }, "t1").start();
+
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                synchronized (lock)
+                {
+                    log.debug("执行t2....");
+                    try
+                    {
+                        lock.wait(200);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                    log.debug("t2被唤醒....");
+                }
+            }
+        }, "t2").start();
+
+
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                synchronized (lock)
+                {
+                    log.debug("执行t3....");
+                    try
+                    {
+                        lock.wait(2000);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                    log.debug("t3被唤醒....");
+                }
+            }
+        }, "t3").start();
+
+        Thread.sleep(1000);
+        synchronized (lock)
+        {
+            lock.notify();
+        }
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-01  20:33:48.912  [t1] DEBUG mao.t3.Test:  执行t1....
+2022-09-01  20:33:48.914  [t3] DEBUG mao.t3.Test:  执行t3....
+2022-09-01  20:33:48.914  [t2] DEBUG mao.t3.Test:  执行t2....
+2022-09-01  20:33:49.128  [t2] DEBUG mao.t3.Test:  t2被唤醒....
+2022-09-01  20:33:49.414  [t1] DEBUG mao.t3.Test:  t1被唤醒....
+2022-09-01  20:33:49.911  [t3] DEBUG mao.t3.Test:  t3被唤醒....
+```
+
+
+
+
+
+
+
+### 示例
+
