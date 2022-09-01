@@ -6340,3 +6340,303 @@ public class Test
 
 
 
+
+
+```java
+package mao.t7;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Project name(项目名称)：java并发编程_wait_notify
+ * Package(包名): mao.t7
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/1
+ * Time(创建时间)： 20:53
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 房间
+     */
+    private static final Object room = new Object();
+
+    /**
+     * 是否有香烟
+     */
+    private static boolean hasCigarette = false;
+
+    /**
+     * 是否有外卖
+     */
+    private static boolean hasTakeout = false;
+
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+
+    public static void main(String[] args) throws InterruptedException
+    {
+        new Thread(() ->
+        {
+            synchronized (room)
+            {
+                log.debug("有烟没？[{}]", hasCigarette);
+                if (!hasCigarette)
+                {
+                    log.debug("没烟，先歇会！");
+                    try
+                    {
+                        room.wait();
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                }
+                log.debug("有烟没？[{}]", hasCigarette);
+                if (hasCigarette)
+                {
+                    log.debug("可以开始干活了");
+                }
+                else
+                {
+                    log.debug("没干成活...");
+                }
+            }
+        }, "小南").start();
+
+        new Thread(() ->
+        {
+            synchronized (room)
+            {
+                log.debug("外卖送到没？[{}]", hasTakeout);
+                if (!hasTakeout)
+                {
+                    log.debug("没外卖，先歇会！");
+                    try
+                    {
+                        room.wait();
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                }
+                log.debug("外卖送到没？[{}]", hasTakeout);
+                if (hasTakeout)
+                {
+                    log.debug("可以开始干活了");
+                }
+                else
+                {
+                    log.debug("没干成活...");
+                }
+            }
+        }, "小女").start();
+
+        Thread.sleep(1000);
+
+        new Thread(() ->
+        {
+            synchronized (room)
+            {
+                hasTakeout = true;
+                log.debug("外卖到了噢！");
+                room.notifyAll();
+            }
+        }, "送外卖的").start();
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-01  20:55:15.165  [小南] DEBUG mao.t7.Test:  有烟没？[false]
+2022-09-01  20:55:15.167  [小南] DEBUG mao.t7.Test:  没烟，先歇会！
+2022-09-01  20:55:15.167  [小女] DEBUG mao.t7.Test:  外卖送到没？[false]
+2022-09-01  20:55:15.168  [小女] DEBUG mao.t7.Test:  没外卖，先歇会！
+2022-09-01  20:55:16.164  [送外卖的] DEBUG mao.t7.Test:  外卖到了噢！
+2022-09-01  20:55:16.165  [小南] DEBUG mao.t7.Test:  有烟没？[false]
+2022-09-01  20:55:16.165  [小南] DEBUG mao.t7.Test:  没干成活...
+2022-09-01  20:55:16.165  [小女] DEBUG mao.t7.Test:  外卖送到没？[true]
+2022-09-01  20:55:16.165  [小女] DEBUG mao.t7.Test:  可以开始干活了
+```
+
+
+
+问题：
+
+* 用 notifyAll 仅解决某个线程的唤醒问题，但使用 if + wait 判断仅有一次机会，一旦条件不成立，就没有重新 判断的机会了
+* 解决方法，用 while + wait，当条件不成立，再次 wait
+
+
+
+```java
+package mao.t8;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Project name(项目名称)：java并发编程_wait_notify
+ * Package(包名): mao.t8
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/1
+ * Time(创建时间)： 20:56
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 房间
+     */
+    private static final Object room = new Object();
+
+    /**
+     * 是否有香烟
+     */
+    private static boolean hasCigarette = false;
+
+    /**
+     * 是否有外卖
+     */
+    private static boolean hasTakeout = false;
+
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+
+    public static void main(String[] args) throws InterruptedException
+    {
+        new Thread(() ->
+        {
+            synchronized (room)
+            {
+                log.debug("有烟没？[{}]", hasCigarette);
+                while (!hasCigarette)
+                {
+                    log.debug("没烟，先歇会！");
+                    try
+                    {
+                        room.wait();
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                    log.debug("有烟没？[{}]", hasCigarette);
+                }
+                if (hasCigarette)
+                {
+                    log.debug("可以开始干活了");
+                }
+                else
+                {
+                    log.debug("没干成活...");
+                }
+            }
+        }, "小南").start();
+
+        new Thread(() ->
+        {
+            synchronized (room)
+            {
+                log.debug("外卖送到没？[{}]", hasTakeout);
+                while (!hasTakeout)
+                {
+                    log.debug("没外卖，先歇会！");
+                    try
+                    {
+                        room.wait();
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                    log.debug("外卖送到没？[{}]", hasTakeout);
+                }
+                if (hasTakeout)
+                {
+                    log.debug("可以开始干活了");
+                }
+                else
+                {
+                    log.debug("没干成活...");
+                }
+            }
+        }, "小女").start();
+
+        Thread.sleep(1000);
+
+        new Thread(() ->
+        {
+            synchronized (room)
+            {
+                hasTakeout = true;
+                log.debug("外卖到了噢！");
+                room.notifyAll();
+            }
+        }, "送外卖的").start();
+
+        Thread.sleep(2000);
+
+        new Thread(() ->
+        {
+            synchronized (room)
+            {
+                hasCigarette = true;
+                log.debug("烟到了噢！");
+                room.notifyAll();
+            }
+        }, "送烟的").start();
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-01  21:00:25.420  [小南] DEBUG mao.t8.Test:  有烟没？[false]
+2022-09-01  21:00:25.423  [小南] DEBUG mao.t8.Test:  没烟，先歇会！
+2022-09-01  21:00:25.423  [小女] DEBUG mao.t8.Test:  外卖送到没？[false]
+2022-09-01  21:00:25.423  [小女] DEBUG mao.t8.Test:  没外卖，先歇会！
+2022-09-01  21:00:26.429  [送外卖的] DEBUG mao.t8.Test:  外卖到了噢！
+2022-09-01  21:00:26.429  [小南] DEBUG mao.t8.Test:  有烟没？[false]
+2022-09-01  21:00:26.429  [小南] DEBUG mao.t8.Test:  没烟，先歇会！
+2022-09-01  21:00:26.429  [小女] DEBUG mao.t8.Test:  外卖送到没？[true]
+2022-09-01  21:00:26.429  [小女] DEBUG mao.t8.Test:  可以开始干活了
+2022-09-01  21:00:28.440  [送烟的] DEBUG mao.t8.Test:  烟到了噢！
+2022-09-01  21:00:28.440  [小南] DEBUG mao.t8.Test:  有烟没？[true]
+2022-09-01  21:00:28.441  [小南] DEBUG mao.t8.Test:  可以开始干活了
+```
+
+
+
+
+
+
+
+### 模式之保护性暂停
+
