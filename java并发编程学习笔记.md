@@ -5343,3 +5343,265 @@ Space losses: 0 bytes internal + 4 bytes external = 4 bytes total
 
 ## wait notify
 
+* 由于条件不满足，小南不能继续进行计算
+* 但小南如果一直占用着锁，其它人就得一直阻塞，效率太低
+* 于是老王单开了一间休息室（调用 wait 方法），让小南到休息室（WaitSet）等着去了，但这时锁释放开，其它人可以由老王随机安排进屋
+* 直到小女进来，调用 notify 方法
+* 小南于是可以离开休息室，重新进入竞争锁的队列
+
+
+
+### API
+
+* obj.wait() 让进入 object 监视器的线程到 waitSet 等待
+* obj.notify() 在 object 上正在 waitSet 等待的线程中挑一个唤醒
+* obj.notifyAll() 让 object 上正在 waitSet 等待的线程全部唤醒
+
+
+
+
+
+```java
+public class Object {
+
+    /**
+     * Constructs a new object.
+     */
+    @IntrinsicCandidate
+    public Object() {}
+
+    /**
+     * Wakes up a single thread that is waiting on this object's
+     * monitor. If any threads are waiting on this object, one of them
+     * is chosen to be awakened. The choice is arbitrary and occurs at
+     * the discretion of the implementation. A thread waits on an object's
+     * monitor by calling one of the {@code wait} methods.
+     * <p>
+     * The awakened thread will not be able to proceed until the current
+     * thread relinquishes the lock on this object. The awakened thread will
+     * compete in the usual manner with any other threads that might be
+     * actively competing to synchronize on this object; for example, the
+     * awakened thread enjoys no reliable privilege or disadvantage in being
+     * the next thread to lock this object.
+     * <p>
+     * This method should only be called by a thread that is the owner
+     * of this object's monitor. A thread becomes the owner of the
+     * object's monitor in one of three ways:
+     * <ul>
+     * <li>By executing a synchronized instance method of that object.
+     * <li>By executing the body of a {@code synchronized} statement
+     *     that synchronizes on the object.
+     * <li>For objects of type {@code Class,} by executing a
+     *     synchronized static method of that class.
+     * </ul>
+     * <p>
+     * Only one thread at a time can own an object's monitor.
+     *
+     * @throws  IllegalMonitorStateException  if the current thread is not
+     *               the owner of this object's monitor.
+     * @see        java.lang.Object#notifyAll()
+     * @see        java.lang.Object#wait()
+     */
+    @IntrinsicCandidate
+    public final native void notify();
+
+    /**
+     * Wakes up all threads that are waiting on this object's monitor. A
+     * thread waits on an object's monitor by calling one of the
+     * {@code wait} methods.
+     * <p>
+     * The awakened threads will not be able to proceed until the current
+     * thread relinquishes the lock on this object. The awakened threads
+     * will compete in the usual manner with any other threads that might
+     * be actively competing to synchronize on this object; for example,
+     * the awakened threads enjoy no reliable privilege or disadvantage in
+     * being the next thread to lock this object.
+     * <p>
+     * This method should only be called by a thread that is the owner
+     * of this object's monitor. See the {@code notify} method for a
+     * description of the ways in which a thread can become the owner of
+     * a monitor.
+     *
+     * @throws  IllegalMonitorStateException  if the current thread is not
+     *               the owner of this object's monitor.
+     * @see        java.lang.Object#notify()
+     * @see        java.lang.Object#wait()
+     */
+    @IntrinsicCandidate
+    public final native void notifyAll();
+
+    /**
+     * Causes the current thread to wait until it is awakened, typically
+     * by being <em>notified</em> or <em>interrupted</em>.
+     * <p>
+     * In all respects, this method behaves as if {@code wait(0L, 0)}
+     * had been called. See the specification of the {@link #wait(long, int)} method
+     * for details.
+     *
+     * @throws IllegalMonitorStateException if the current thread is not
+     *         the owner of the object's monitor
+     * @throws InterruptedException if any thread interrupted the current thread before or
+     *         while the current thread was waiting. The <em>interrupted status</em> of the
+     *         current thread is cleared when this exception is thrown.
+     * @see    #notify()
+     * @see    #notifyAll()
+     * @see    #wait(long)
+     * @see    #wait(long, int)
+     */
+    public final void wait() throws InterruptedException {
+        wait(0L);
+    }
+
+    /**
+     * Causes the current thread to wait until it is awakened, typically
+     * by being <em>notified</em> or <em>interrupted</em>, or until a
+     * certain amount of real time has elapsed.
+     * <p>
+     * In all respects, this method behaves as if {@code wait(timeoutMillis, 0)}
+     * had been called. See the specification of the {@link #wait(long, int)} method
+     * for details.
+     *
+     * @param  timeoutMillis the maximum time to wait, in milliseconds
+     * @throws IllegalArgumentException if {@code timeoutMillis} is negative
+     * @throws IllegalMonitorStateException if the current thread is not
+     *         the owner of the object's monitor
+     * @throws InterruptedException if any thread interrupted the current thread before or
+     *         while the current thread was waiting. The <em>interrupted status</em> of the
+     *         current thread is cleared when this exception is thrown.
+     * @see    #notify()
+     * @see    #notifyAll()
+     * @see    #wait()
+     * @see    #wait(long, int)
+     */
+    public final native void wait(long timeoutMillis) throws InterruptedException;
+
+    /**
+     * Causes the current thread to wait until it is awakened, typically
+     * by being <em>notified</em> or <em>interrupted</em>, or until a
+     * certain amount of real time has elapsed.
+     * <p>
+     * The current thread must own this object's monitor lock. See the
+     * {@link #notify notify} method for a description of the ways in which
+     * a thread can become the owner of a monitor lock.
+     * <p>
+     * This method causes the current thread (referred to here as <var>T</var>) to
+     * place itself in the wait set for this object and then to relinquish any
+     * and all synchronization claims on this object. Note that only the locks
+     * on this object are relinquished; any other objects on which the current
+     * thread may be synchronized remain locked while the thread waits.
+     * <p>
+     * Thread <var>T</var> then becomes disabled for thread scheduling purposes
+     * and lies dormant until one of the following occurs:
+     * <ul>
+     * <li>Some other thread invokes the {@code notify} method for this
+     * object and thread <var>T</var> happens to be arbitrarily chosen as
+     * the thread to be awakened.
+     * <li>Some other thread invokes the {@code notifyAll} method for this
+     * object.
+     * <li>Some other thread {@linkplain Thread#interrupt() interrupts}
+     * thread <var>T</var>.
+     * <li>The specified amount of real time has elapsed, more or less.
+     * The amount of real time, in nanoseconds, is given by the expression
+     * {@code 1000000 * timeoutMillis + nanos}. If {@code timeoutMillis} and {@code nanos}
+     * are both zero, then real time is not taken into consideration and the
+     * thread waits until awakened by one of the other causes.
+     * <li>Thread <var>T</var> is awakened spuriously. (See below.)
+     * </ul>
+     * <p>
+     * The thread <var>T</var> is then removed from the wait set for this
+     * object and re-enabled for thread scheduling. It competes in the
+     * usual manner with other threads for the right to synchronize on the
+     * object; once it has regained control of the object, all its
+     * synchronization claims on the object are restored to the status quo
+     * ante - that is, to the situation as of the time that the {@code wait}
+     * method was invoked. Thread <var>T</var> then returns from the
+     * invocation of the {@code wait} method. Thus, on return from the
+     * {@code wait} method, the synchronization state of the object and of
+     * thread {@code T} is exactly as it was when the {@code wait} method
+     * was invoked.
+     * <p>
+     * A thread can wake up without being notified, interrupted, or timing out, a
+     * so-called <em>spurious wakeup</em>.  While this will rarely occur in practice,
+     * applications must guard against it by testing for the condition that should
+     * have caused the thread to be awakened, and continuing to wait if the condition
+     * is not satisfied. See the example below.
+     * <p>
+     * For more information on this topic, see section 14.2,
+     * "Condition Queues," in Brian Goetz and others' <em>Java Concurrency
+     * in Practice</em> (Addison-Wesley, 2006) or Item 69 in Joshua
+     * Bloch's <em>Effective Java, Second Edition</em> (Addison-Wesley,
+     * 2008).
+     * <p>
+     * If the current thread is {@linkplain java.lang.Thread#interrupt() interrupted}
+     * by any thread before or while it is waiting, then an {@code InterruptedException}
+     * is thrown.  The <em>interrupted status</em> of the current thread is cleared when
+     * this exception is thrown. This exception is not thrown until the lock status of
+     * this object has been restored as described above.
+     *
+     * @apiNote
+     * The recommended approach to waiting is to check the condition being awaited in
+     * a {@code while} loop around the call to {@code wait}, as shown in the example
+     * below. Among other things, this approach avoids problems that can be caused
+     * by spurious wakeups.
+     *
+     * <pre>{@code
+     *     synchronized (obj) {
+     *         while (<condition does not hold> and <timeout not exceeded>) {
+     *             long timeoutMillis = ... ; // recompute timeout values
+     *             int nanos = ... ;
+     *             obj.wait(timeoutMillis, nanos);
+     *         }
+     *         ... // Perform action appropriate to condition or timeout
+     *     }
+     * }</pre>
+     *
+     * @param  timeoutMillis the maximum time to wait, in milliseconds
+     * @param  nanos   additional time, in nanoseconds, in the range 0-999999 inclusive
+     * @throws IllegalArgumentException if {@code timeoutMillis} is negative,
+     *         or if the value of {@code nanos} is out of range
+     * @throws IllegalMonitorStateException if the current thread is not
+     *         the owner of the object's monitor
+     * @throws InterruptedException if any thread interrupted the current thread before or
+     *         while the current thread was waiting. The <em>interrupted status</em> of the
+     *         current thread is cleared when this exception is thrown.
+     * @see    #notify()
+     * @see    #notifyAll()
+     * @see    #wait()
+     * @see    #wait(long)
+     */
+    public final void wait(long timeoutMillis, int nanos) throws InterruptedException {
+        if (timeoutMillis < 0) {
+            throw new IllegalArgumentException("timeoutMillis value is negative");
+        }
+
+        if (nanos < 0 || nanos > 999999) {
+            throw new IllegalArgumentException(
+                                "nanosecond timeout value out of range");
+        }
+
+        if (nanos > 0 && timeoutMillis < Long.MAX_VALUE) {
+            timeoutMillis++;
+        }
+
+        wait(timeoutMillis);
+    }
+}
+```
+
+
+
+
+
+### sleep和 wait的区别
+
+* sleep 是 Thread 方法，而 wait 是 Object 的方法
+* sleep 不需要强制和 synchronized 配合使用，但 wait 需要 和 synchronized 一起用
+* sleep 在睡眠的同时，不会释放对象锁，但 wait 在等待的时候会释放对象锁
+* 它们的状态为 TIMED_WAITING
+
+
+
+
+
+### 使用
+
