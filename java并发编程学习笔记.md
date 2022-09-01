@@ -5951,3 +5951,392 @@ public class Test
 
 ### 示例
 
+```java
+package mao.t4;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Project name(项目名称)：java并发编程_wait_notify
+ * Package(包名): mao.t4
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/1
+ * Time(创建时间)： 20:36
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 房间
+     */
+    private static final Object room = new Object();
+
+    /**
+     * 是否有香烟
+     */
+    private static boolean hasCigarette = false;
+
+    /**
+     * 是否有外卖
+     */
+    private static boolean hasTakeout = false;
+
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+
+    public static void main(String[] args) throws InterruptedException
+    {
+        new Thread(() ->
+        {
+            synchronized (room)
+            {
+                log.debug("有烟没？[{}]", hasCigarette);
+                if (!hasCigarette)
+                {
+                    log.debug("没烟，先歇会！");
+                    try
+                    {
+                        Thread.sleep(2000);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                }
+                log.debug("有烟没？[{}]", hasCigarette);
+                if (hasCigarette)
+                {
+                    log.debug("可以开始干活了");
+                }
+            }
+        }, "小南").start();
+
+        for (int i = 0; i < 5; i++)
+        {
+            new Thread(() ->
+            {
+                synchronized (room)
+                {
+                    log.debug("可以开始干活了");
+                }
+            }, "其它人").start();
+        }
+
+        Thread.sleep(1000);
+
+        new Thread(() ->
+        {
+            hasCigarette = true;
+            log.debug("烟到了噢！");
+        }, "送烟的").start();
+    }
+
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-01  20:41:29.374  [小南] DEBUG mao.t4.Test:  有烟没？[false]
+2022-09-01  20:41:29.376  [小南] DEBUG mao.t4.Test:  没烟，先歇会！
+2022-09-01  20:41:30.373  [送烟的] DEBUG mao.t4.Test:  烟到了噢！
+2022-09-01  20:41:31.379  [小南] DEBUG mao.t4.Test:  有烟没？[true]
+2022-09-01  20:41:31.379  [小南] DEBUG mao.t4.Test:  可以开始干活了
+2022-09-01  20:41:31.379  [其它人] DEBUG mao.t4.Test:  可以开始干活了
+2022-09-01  20:41:31.380  [其它人] DEBUG mao.t4.Test:  可以开始干活了
+2022-09-01  20:41:31.380  [其它人] DEBUG mao.t4.Test:  可以开始干活了
+2022-09-01  20:41:31.381  [其它人] DEBUG mao.t4.Test:  可以开始干活了
+2022-09-01  20:41:31.381  [其它人] DEBUG mao.t4.Test:  可以开始干活了
+```
+
+
+
+
+
+问题：
+
+*  其它干活的线程，都要一直阻塞，效率太低
+* 小南线程必须睡足 2s 后才能醒来，就算烟提前送到，也无法立刻醒来
+* 加了 synchronized (room) 后，就好比小南在里面反锁了门睡觉，烟根本没法送进门，main 没加 synchronized 就好像 main 线程是翻窗户进来的
+* 解决方法，使用 wait - notify 机制
+
+
+
+
+
+```java
+package mao.t5;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Project name(项目名称)：java并发编程_wait_notify
+ * Package(包名): mao.t5
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/1
+ * Time(创建时间)： 20:43
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 房间
+     */
+    private static final Object room = new Object();
+
+    /**
+     * 是否有香烟
+     */
+    private static boolean hasCigarette = false;
+
+    /**
+     * 是否有外卖
+     */
+    private static boolean hasTakeout = false;
+
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+
+    public static void main(String[] args) throws InterruptedException
+    {
+        new Thread(() ->
+        {
+            synchronized (room)
+            {
+                log.debug("有烟没？[{}]", hasCigarette);
+                if (!hasCigarette)
+                {
+                    log.debug("没烟，先歇会！");
+                    try
+                    {
+                        room.wait(2000);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                }
+                log.debug("有烟没？[{}]", hasCigarette);
+                if (hasCigarette)
+                {
+                    log.debug("可以开始干活了");
+                }
+            }
+        }, "小南").start();
+
+        for (int i = 0; i < 5; i++)
+        {
+            new Thread(() ->
+            {
+                synchronized (room)
+                {
+                    log.debug("可以开始干活了");
+                }
+            }, "其它人").start();
+        }
+
+
+        Thread.sleep(1000);
+
+        new Thread(() ->
+        {
+            synchronized (room)
+            {
+                hasCigarette = true;
+                log.debug("烟到了噢！");
+                room.notify();
+            }
+        }, "送烟的").start();
+
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-01  20:45:47.213  [小南] DEBUG mao.t5.Test:  有烟没？[false]
+2022-09-01  20:45:47.216  [小南] DEBUG mao.t5.Test:  没烟，先歇会！
+2022-09-01  20:45:47.216  [其它人] DEBUG mao.t5.Test:  可以开始干活了
+2022-09-01  20:45:47.217  [其它人] DEBUG mao.t5.Test:  可以开始干活了
+2022-09-01  20:45:47.217  [其它人] DEBUG mao.t5.Test:  可以开始干活了
+2022-09-01  20:45:47.217  [其它人] DEBUG mao.t5.Test:  可以开始干活了
+2022-09-01  20:45:47.217  [其它人] DEBUG mao.t5.Test:  可以开始干活了
+2022-09-01  20:45:48.210  [送烟的] DEBUG mao.t5.Test:  烟到了噢！
+2022-09-01  20:45:48.211  [小南] DEBUG mao.t5.Test:  有烟没？[true]
+2022-09-01  20:45:48.211  [小南] DEBUG mao.t5.Test:  可以开始干活了
+```
+
+
+
+问题：
+
+*  解决了其它干活的线程阻塞的问题
+* 但如果有其它线程也在等待条件呢？还需要进一步解决
+
+
+
+
+
+```java
+package mao.t6;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Project name(项目名称)：java并发编程_wait_notify
+ * Package(包名): mao.t6
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/1
+ * Time(创建时间)： 20:47
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 房间
+     */
+    private static final Object room = new Object();
+
+    /**
+     * 是否有香烟
+     */
+    private static boolean hasCigarette = false;
+
+    /**
+     * 是否有外卖
+     */
+    private static boolean hasTakeout = false;
+
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+
+    public static void main(String[] args) throws InterruptedException
+    {
+        new Thread(() ->
+        {
+            synchronized (room)
+            {
+                log.debug("有烟没？[{}]", hasCigarette);
+                if (!hasCigarette)
+                {
+                    log.debug("没烟，先歇会！");
+                    try
+                    {
+                        room.wait();
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                }
+                log.debug("有烟没？[{}]", hasCigarette);
+                if (hasCigarette)
+                {
+                    log.debug("可以开始干活了");
+                }
+                else
+                {
+                    log.debug("没干成活...");
+                }
+            }
+        }, "小南").start();
+
+        new Thread(() ->
+        {
+            synchronized (room)
+            {
+                log.debug("外卖送到没？[{}]", hasTakeout);
+                if (!hasTakeout)
+                {
+                    log.debug("没外卖，先歇会！");
+                    try
+                    {
+                        room.wait();
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                }
+                log.debug("外卖送到没？[{}]", hasTakeout);
+                if (hasTakeout)
+                {
+                    log.debug("可以开始干活了");
+                }
+                else
+                {
+                    log.debug("没干成活...");
+                }
+            }
+        }, "小女").start();
+
+        Thread.sleep(1000);
+
+        new Thread(() ->
+        {
+            synchronized (room)
+            {
+                hasTakeout = true;
+                log.debug("外卖到了噢！");
+                room.notify();
+            }
+        }, "送外卖的").start();
+    }
+}
+```
+
+
+
+错误结果：
+
+```sh
+2022-09-01  20:50:18.165  [小南] DEBUG mao.t6.Test:  有烟没？[false]
+2022-09-01  20:50:18.168  [小南] DEBUG mao.t6.Test:  没烟，先歇会！
+2022-09-01  20:50:18.168  [小女] DEBUG mao.t6.Test:  外卖送到没？[false]
+2022-09-01  20:50:18.168  [小女] DEBUG mao.t6.Test:  没外卖，先歇会！
+2022-09-01  20:50:19.177  [送外卖的] DEBUG mao.t6.Test:  外卖到了噢！
+2022-09-01  20:50:19.177  [小南] DEBUG mao.t6.Test:  有烟没？[false]
+2022-09-01  20:50:19.177  [小南] DEBUG mao.t6.Test:  没干成活...
+```
+
+
+
+问题：
+
+* notify 只能随机唤醒一个 WaitSet 中的线程，这时如果有其它线程也在等待，那么就可能唤醒不了正确的线程，称之为【虚假唤醒】
+* 解决方法，改为 notifyAll
+
+
+
