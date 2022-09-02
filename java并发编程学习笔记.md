@@ -6638,5 +6638,440 @@ public class Test
 
 
 
-### 模式之保护性暂停
+## 模式之保护性暂停
+
+### 定义
+
+即 Guarded Suspension，用在一个线程等待另一个线程的执行结果
+
+* 有一个结果需要从一个线程传递到另一个线程，让他们关联同一个 GuardedObject
+* 如果有结果不断从一个线程到另一个线程那么可以使用消息队列
+* JDK 中，join 的实现、Future 的实现，采用的就是此模式
+* 因为要等待另一方的结果，因此归类到同步模式
+
+
+
+
+
+### 实现
+
+```java
+package mao.t1;
+
+/**
+ * Project name(项目名称)：java并发编程_保护性暂停
+ * Package(包名): mao.t1
+ * Class(类名): GuardedObject
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/1
+ * Time(创建时间)： 21:39
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class GuardedObject
+{
+    /**
+     * 响应
+     */
+    private Object response;
+    /**
+     * 锁
+     */
+
+    private final Object lock = new Object();
+
+    /**
+     * 得到响应
+     *
+     * @return {@link Object}
+     */
+    public Object getResponse()
+    {
+        synchronized (lock)
+        {
+            while (response == null)
+            {
+                try
+                {
+                    lock.wait();
+                }
+                catch (InterruptedException e)
+                {
+                    e.printStackTrace();
+                }
+            }
+            return response;
+        }
+    }
+
+    /**
+     * 完成
+     *
+     * @param response 响应
+     */
+    public void complete(Object response)
+    {
+        synchronized (lock)
+        {
+            this.response = response;
+            lock.notifyAll();
+        }
+    }
+}
+```
+
+
+
+```java
+package mao.t1;
+
+import java.util.Date;
+
+/**
+ * Project name(项目名称)：java并发编程_保护性暂停
+ * Package(包名): mao.t1
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/1
+ * Time(创建时间)： 21:42
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    public static void main(String[] args)
+    {
+        GuardedObject guardedObject = new GuardedObject();
+
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                //休眠2秒
+                try
+                {
+                    Thread.sleep(2000);
+                }
+                catch (InterruptedException e)
+                {
+                    e.printStackTrace();
+                }
+                //返回结果
+                guardedObject.complete(Math.random());
+
+            }
+        }, "t1").start();
+
+        //主线程等待
+        System.out.println("主线程开始获取t1线程的运行结果");
+        System.out.println(new Date());
+        Object response = guardedObject.getResponse();
+        System.out.println("结果为" + response);
+        System.out.println(new Date());
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+主线程开始获取t1线程的运行结果
+Thu Sep 01 21:52:28 CST 2022
+结果为0.8617855786578636
+Thu Sep 01 21:52:30 CST 2022
+```
+
+
+
+
+
+
+
+### 支持超时时间
+
+
+
+```java
+package mao.t2;
+
+/**
+ * Project name(项目名称)：java并发编程_保护性暂停
+ * Package(包名): mao.t2
+ * Class(类名): GuardedObject
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/2
+ * Time(创建时间)： 22:48
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class GuardedObject
+{
+    /**
+     * 响应
+     */
+    private Object response;
+
+    /**
+     * 锁
+     */
+    private final Object lock = new Object();
+
+
+    /**
+     * 得到响应
+     *
+     * @param millis 毫秒值
+     * @return {@link Object}
+     */
+    public Object getResponse(long millis)
+    {
+        synchronized (lock)
+        {
+            //记录最初时间
+            long begin = System.currentTimeMillis();
+            //已经经历的时间
+            long timePassed = 0;
+            while (response == null)
+            {
+                long waitTime = millis - timePassed;
+                if (waitTime <= 0)
+                {
+                    break;
+                }
+                try
+                {
+                    lock.wait(waitTime);
+                }
+                catch (InterruptedException e)
+                {
+                    e.printStackTrace();
+                }
+                timePassed = System.currentTimeMillis() - begin;
+            }
+            return response;
+        }
+
+    }
+
+    /**
+     * 完成
+     *
+     * @param response 响应
+     */
+    public void complete(Object response)
+    {
+        synchronized (lock)
+        {
+            this.response = response;
+            System.out.println("notify...");
+            lock.notifyAll();
+        }
+    }
+
+}
+```
+
+
+
+```java
+package mao.t2;
+
+import java.util.Date;
+
+/**
+ * Project name(项目名称)：java并发编程_保护性暂停
+ * Package(包名): mao.t2
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/2
+ * Time(创建时间)： 22:53
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    public static void main(String[] args)
+    {
+        GuardedObject guardedObject = new GuardedObject();
+
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                //休眠2秒
+                try
+                {
+                    Thread.sleep(2000);
+                }
+                catch (InterruptedException e)
+                {
+                    e.printStackTrace();
+                }
+                //返回结果
+                guardedObject.complete(Math.random());
+
+            }
+        }, "t1").start();
+
+        //主线程等待
+        System.out.println("主线程开始获取t1线程的运行结果");
+        System.out.println(new Date());
+        Object response = guardedObject.getResponse(1000);
+        System.out.println("结果为" + response);
+        System.out.println(new Date());
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+主线程开始获取t1线程的运行结果
+Fri Sep 02 22:54:41 CST 2022
+结果为null
+Fri Sep 02 22:54:42 CST 2022
+notify...
+```
+
+
+
+
+
+线程的join方法采用此模式
+
+```java
+public class Thread implements Runnable 
+{
+    /**
+     * Waits at most {@code millis} milliseconds for this thread to
+     * die. A timeout of {@code 0} means to wait forever.
+     *
+     * <p> This implementation uses a loop of {@code this.wait} calls
+     * conditioned on {@code this.isAlive}. As a thread terminates the
+     * {@code this.notifyAll} method is invoked. It is recommended that
+     * applications not use {@code wait}, {@code notify}, or
+     * {@code notifyAll} on {@code Thread} instances.
+     *
+     * @param  millis
+     *         the time to wait in milliseconds
+     *
+     * @throws  IllegalArgumentException
+     *          if the value of {@code millis} is negative
+     *
+     * @throws  InterruptedException
+     *          if any thread has interrupted the current thread. The
+     *          <i>interrupted status</i> of the current thread is
+     *          cleared when this exception is thrown.
+     */
+    public final synchronized void join(final long millis)
+    throws InterruptedException {
+        if (millis > 0) {
+            if (isAlive()) {
+                final long startTime = System.nanoTime();
+                long delay = millis;
+                do {
+                    wait(delay);
+                } while (isAlive() && (delay = millis -
+                        TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime)) > 0);
+            }
+        } else if (millis == 0) {
+            while (isAlive()) {
+                wait(0);
+            }
+        } else {
+            throw new IllegalArgumentException("timeout value is negative");
+        }
+    }
+
+    /**
+     * Waits at most {@code millis} milliseconds plus
+     * {@code nanos} nanoseconds for this thread to die.
+     * If both arguments are {@code 0}, it means to wait forever.
+     *
+     * <p> This implementation uses a loop of {@code this.wait} calls
+     * conditioned on {@code this.isAlive}. As a thread terminates the
+     * {@code this.notifyAll} method is invoked. It is recommended that
+     * applications not use {@code wait}, {@code notify}, or
+     * {@code notifyAll} on {@code Thread} instances.
+     *
+     * @param  millis
+     *         the time to wait in milliseconds
+     *
+     * @param  nanos
+     *         {@code 0-999999} additional nanoseconds to wait
+     *
+     * @throws  IllegalArgumentException
+     *          if the value of {@code millis} is negative, or the value
+     *          of {@code nanos} is not in the range {@code 0-999999}
+     *
+     * @throws  InterruptedException
+     *          if any thread has interrupted the current thread. The
+     *          <i>interrupted status</i> of the current thread is
+     *          cleared when this exception is thrown.
+     */
+    public final synchronized void join(long millis, int nanos)
+    throws InterruptedException {
+
+        if (millis < 0) {
+            throw new IllegalArgumentException("timeout value is negative");
+        }
+
+        if (nanos < 0 || nanos > 999999) {
+            throw new IllegalArgumentException(
+                                "nanosecond timeout value out of range");
+        }
+
+        if (nanos > 0 && millis < Long.MAX_VALUE) {
+            millis++;
+        }
+
+        join(millis);
+    }
+
+    /**
+     * Waits for this thread to die.
+     *
+     * <p> An invocation of this method behaves in exactly the same
+     * way as the invocation
+     *
+     * <blockquote>
+     * {@linkplain #join(long) join}{@code (0)}
+     * </blockquote>
+     *
+     * @throws  InterruptedException
+     *          if any thread has interrupted the current thread. The
+     *          <i>interrupted status</i> of the current thread is
+     *          cleared when this exception is thrown.
+     */
+    public final void join() throws InterruptedException {
+        join(0);
+    }
+}
+```
+
+
+
+
+
+
+
+### 多任务
 
