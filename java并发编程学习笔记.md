@@ -7075,3 +7075,333 @@ public class Thread implements Runnable
 
 ### 多任务
 
+```java
+package mao.t3;
+
+/**
+ * Project name(项目名称)：java并发编程_保护性暂停
+ * Package(包名): mao.t3
+ * Class(类名): GuardedObject
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/2
+ * Time(创建时间)： 23:12
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class GuardedObject
+{
+    // 标识 Guarded Object
+    private int id;
+
+    /**
+     * 响应
+     */
+    private Object response;
+
+    /**
+     * 保护对象
+     *
+     * @param id id
+     */
+    public GuardedObject(int id)
+    {
+        this.id = id;
+    }
+
+    /**
+     * 得到id
+     *
+     * @return int
+     */
+    public int getId()
+    {
+        return id;
+    }
+
+    /**
+     * 得到响应
+     *
+     * @param timeout 超时时间
+     * @return {@link Object}
+     */
+    public Object getResponse(long timeout)
+    {
+        synchronized (this)
+        {
+            long begin = System.currentTimeMillis();
+            long passedTime = 0;
+            while (response == null)
+            {
+                long waitTime = timeout - passedTime;
+                if (timeout - passedTime <= 0)
+                {
+                    break;
+                }
+                try
+                {
+                    this.wait(waitTime);
+                }
+                catch (InterruptedException e)
+                {
+                    e.printStackTrace();
+                }
+                passedTime = System.currentTimeMillis() - begin;
+            }
+            return response;
+        }
+    }
+
+    /**
+     * 完成
+     *
+     * @param response 响应
+     */
+    public void complete(Object response)
+    {
+        synchronized (this)
+        {
+            // 给结果成员变量赋值
+            this.response = response;
+            this.notifyAll();
+        }
+    }
+
+
+}
+```
+
+
+
+
+
+```java
+package mao.t3;
+
+import java.util.Hashtable;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * Project name(项目名称)：java并发编程_保护性暂停
+ * Package(包名): mao.t3
+ * Class(类名): Mailboxes
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/2
+ * Time(创建时间)： 23:15
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Mailboxes
+{
+    /**
+     * 盒子
+     */
+    private static final Map<Integer, GuardedObject> boxes = new Hashtable<>();
+
+    private static int id = 1;
+
+    /**
+     * 生成id
+     *
+     * @return int
+     */
+    private static synchronized int generateId()
+    {
+        return id++;
+    }
+
+    /**
+     * 获得保护对象
+     *
+     * @param id id
+     * @return {@link GuardedObject}
+     */
+    public static GuardedObject getGuardedObject(int id)
+    {
+        return boxes.remove(id);
+    }
+
+    /**
+     * 创建对象
+     *
+     * @return {@link GuardedObject}
+     */
+    public static GuardedObject createGuardedObject()
+    {
+        GuardedObject guardedObject = new GuardedObject(generateId());
+        boxes.put(guardedObject.getId(), guardedObject);
+        return guardedObject;
+    }
+
+    /**
+     * 得到id
+     *
+     * @return {@link Set}<{@link Integer}>
+     */
+    public static Set<Integer> getIds()
+    {
+        return boxes.keySet();
+    }
+}
+```
+
+
+
+
+
+```java
+package mao.t3;
+
+/**
+ * Project name(项目名称)：java并发编程_保护性暂停
+ * Package(包名): mao.t3
+ * Class(类名): Consumer
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/2
+ * Time(创建时间)： 23:18
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Consumer extends Thread
+{
+    @Override
+    public void run()
+    {
+        GuardedObject guardedObject = Mailboxes.createGuardedObject();
+        System.out.println("开始收信 id:" + guardedObject.getId());
+        Object mail = guardedObject.getResponse(5000);
+        System.out.println("收到信 id:" + guardedObject.getId() + ", 内容:" + mail);
+    }
+}
+```
+
+
+
+
+
+```java
+package mao.t3;
+
+/**
+ * Project name(项目名称)：java并发编程_保护性暂停
+ * Package(包名): mao.t3
+ * Class(类名): Producer
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/2
+ * Time(创建时间)： 23:21
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Producer extends Thread
+{
+    /**
+     * id
+     */
+    private final int id;
+
+    /**
+     * 邮件
+     */
+    private final String mail;
+
+    /**
+     * 生产商
+     *
+     * @param id   id
+     * @param mail 邮件
+     */
+    public Producer(int id, String mail)
+    {
+        this.id = id;
+        this.mail = mail;
+    }
+
+    /**
+     * 运行
+     */
+    @Override
+    public void run()
+    {
+        GuardedObject guardedObject = Mailboxes.getGuardedObject(id);
+        System.out.println("送信 id:" + id + ", 内容:" + mail);
+        guardedObject.complete(mail);
+    }
+}
+```
+
+
+
+
+
+```java
+package mao.t3;
+
+/**
+ * Project name(项目名称)：java并发编程_保护性暂停
+ * Package(包名): mao.t3
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/2
+ * Time(创建时间)： 23:23
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    public static void main(String[] args) throws InterruptedException
+    {
+        for (int i = 0; i < 3; i++)
+        {
+            new Consumer().start();
+        }
+
+        Thread.sleep(2000);
+
+        for (Integer id : Mailboxes.getIds())
+        {
+            new Producer(id, "内容" + id).start();
+        }
+
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+开始收信 id:2
+开始收信 id:3
+开始收信 id:1
+送信 id:3, 内容:内容3
+送信 id:1, 内容:内容1
+收到信 id:3, 内容:内容3
+送信 id:2, 内容:内容2
+收到信 id:1, 内容:内容1
+收到信 id:2, 内容:内容2
+```
+
+
+
+
+
+
+
+## Park和Unpark
+
