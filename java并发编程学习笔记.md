@@ -7405,3 +7405,469 @@ public class Test
 
 ## Park和Unpark
 
+
+
+### API
+
+它们是 LockSupport 类中的方法
+
+
+
+* LockSupport.park() ：暂停当前线程
+* LockSupport.unpark(暂停线程对象) ：恢复某个线程的运行
+
+
+
+```java
+public class LockSupport {
+    private LockSupport() {} // Cannot be instantiated.
+
+    private static void setBlocker(Thread t, Object arg) {
+        U.putReferenceOpaque(t, PARKBLOCKER, arg);
+    }
+
+    /**
+     * Sets the object to be returned by invocations of {@link
+     * #getBlocker getBlocker} for the current thread. This method may
+     * be used before invoking the no-argument version of {@link
+     * LockSupport#park() park()} from non-public objects, allowing
+     * more helpful diagnostics, or retaining compatibility with
+     * previous implementations of blocking methods.  Previous values
+     * of the blocker are not automatically restored after blocking.
+     * To obtain the effects of {@code park(b}}, use {@code
+     * setCurrentBlocker(b); park(); setCurrentBlocker(null);}
+     *
+     * @param blocker the blocker object
+     * @since 14
+     */
+    public static void setCurrentBlocker(Object blocker) {
+        U.putReferenceOpaque(Thread.currentThread(), PARKBLOCKER, blocker);
+    }
+
+    /**
+     * Makes available the permit for the given thread, if it
+     * was not already available.  If the thread was blocked on
+     * {@code park} then it will unblock.  Otherwise, its next call
+     * to {@code park} is guaranteed not to block. This operation
+     * is not guaranteed to have any effect at all if the given
+     * thread has not been started.
+     *
+     * @param thread the thread to unpark, or {@code null}, in which case
+     *        this operation has no effect
+     */
+    public static void unpark(Thread thread) {
+        if (thread != null)
+            U.unpark(thread);
+    }
+
+    /**
+     * Disables the current thread for thread scheduling purposes unless the
+     * permit is available.
+     *
+     * <p>If the permit is available then it is consumed and the call returns
+     * immediately; otherwise
+     * the current thread becomes disabled for thread scheduling
+     * purposes and lies dormant until one of three things happens:
+     *
+     * <ul>
+     * <li>Some other thread invokes {@link #unpark unpark} with the
+     * current thread as the target; or
+     *
+     * <li>Some other thread {@linkplain Thread#interrupt interrupts}
+     * the current thread; or
+     *
+     * <li>The call spuriously (that is, for no reason) returns.
+     * </ul>
+     *
+     * <p>This method does <em>not</em> report which of these caused the
+     * method to return. Callers should re-check the conditions which caused
+     * the thread to park in the first place. Callers may also determine,
+     * for example, the interrupt status of the thread upon return.
+     *
+     * @param blocker the synchronization object responsible for this
+     *        thread parking
+     * @since 1.6
+     */
+    public static void park(Object blocker) {
+        Thread t = Thread.currentThread();
+        setBlocker(t, blocker);
+        U.park(false, 0L);
+        setBlocker(t, null);
+    }
+
+    /**
+     * Disables the current thread for thread scheduling purposes, for up to
+     * the specified waiting time, unless the permit is available.
+     *
+     * <p>If the specified waiting time is zero or negative, the
+     * method does nothing. Otherwise, if the permit is available then
+     * it is consumed and the call returns immediately; otherwise the
+     * current thread becomes disabled for thread scheduling purposes
+     * and lies dormant until one of four things happens:
+     *
+     * <ul>
+     * <li>Some other thread invokes {@link #unpark unpark} with the
+     * current thread as the target; or
+     *
+     * <li>Some other thread {@linkplain Thread#interrupt interrupts}
+     * the current thread; or
+     *
+     * <li>The specified waiting time elapses; or
+     *
+     * <li>The call spuriously (that is, for no reason) returns.
+     * </ul>
+     *
+     * <p>This method does <em>not</em> report which of these caused the
+     * method to return. Callers should re-check the conditions which caused
+     * the thread to park in the first place. Callers may also determine,
+     * for example, the interrupt status of the thread, or the elapsed time
+     * upon return.
+     *
+     * @param blocker the synchronization object responsible for this
+     *        thread parking
+     * @param nanos the maximum number of nanoseconds to wait
+     * @since 1.6
+     */
+    public static void parkNanos(Object blocker, long nanos) {
+        if (nanos > 0) {
+            Thread t = Thread.currentThread();
+            setBlocker(t, blocker);
+            U.park(false, nanos);
+            setBlocker(t, null);
+        }
+    }
+
+    /**
+     * Disables the current thread for thread scheduling purposes, until
+     * the specified deadline, unless the permit is available.
+     *
+     * <p>If the permit is available then it is consumed and the call
+     * returns immediately; otherwise the current thread becomes disabled
+     * for thread scheduling purposes and lies dormant until one of four
+     * things happens:
+     *
+     * <ul>
+     * <li>Some other thread invokes {@link #unpark unpark} with the
+     * current thread as the target; or
+     *
+     * <li>Some other thread {@linkplain Thread#interrupt interrupts} the
+     * current thread; or
+     *
+     * <li>The specified deadline passes; or
+     *
+     * <li>The call spuriously (that is, for no reason) returns.
+     * </ul>
+     *
+     * <p>This method does <em>not</em> report which of these caused the
+     * method to return. Callers should re-check the conditions which caused
+     * the thread to park in the first place. Callers may also determine,
+     * for example, the interrupt status of the thread, or the current time
+     * upon return.
+     *
+     * @param blocker the synchronization object responsible for this
+     *        thread parking
+     * @param deadline the absolute time, in milliseconds from the Epoch,
+     *        to wait until
+     * @since 1.6
+     */
+    public static void parkUntil(Object blocker, long deadline) {
+        Thread t = Thread.currentThread();
+        setBlocker(t, blocker);
+        U.park(true, deadline);
+        setBlocker(t, null);
+    }
+
+    /**
+     * Returns the blocker object supplied to the most recent
+     * invocation of a park method that has not yet unblocked, or null
+     * if not blocked.  The value returned is just a momentary
+     * snapshot -- the thread may have since unblocked or blocked on a
+     * different blocker object.
+     *
+     * @param t the thread
+     * @return the blocker
+     * @throws NullPointerException if argument is null
+     * @since 1.6
+     */
+    public static Object getBlocker(Thread t) {
+        if (t == null)
+            throw new NullPointerException();
+        return U.getReferenceOpaque(t, PARKBLOCKER);
+    }
+
+    /**
+     * Disables the current thread for thread scheduling purposes unless the
+     * permit is available.
+     *
+     * <p>If the permit is available then it is consumed and the call
+     * returns immediately; otherwise the current thread becomes disabled
+     * for thread scheduling purposes and lies dormant until one of three
+     * things happens:
+     *
+     * <ul>
+     *
+     * <li>Some other thread invokes {@link #unpark unpark} with the
+     * current thread as the target; or
+     *
+     * <li>Some other thread {@linkplain Thread#interrupt interrupts}
+     * the current thread; or
+     *
+     * <li>The call spuriously (that is, for no reason) returns.
+     * </ul>
+     *
+     * <p>This method does <em>not</em> report which of these caused the
+     * method to return. Callers should re-check the conditions which caused
+     * the thread to park in the first place. Callers may also determine,
+     * for example, the interrupt status of the thread upon return.
+     */
+    public static void park() {
+        U.park(false, 0L);
+    }
+
+    /**
+     * Disables the current thread for thread scheduling purposes, for up to
+     * the specified waiting time, unless the permit is available.
+     *
+     * <p>If the specified waiting time is zero or negative, the
+     * method does nothing. Otherwise, if the permit is available then
+     * it is consumed and the call returns immediately; otherwise the
+     * current thread becomes disabled for thread scheduling purposes
+     * and lies dormant until one of four things happens:
+     *
+     * <ul>
+     * <li>Some other thread invokes {@link #unpark unpark} with the
+     * current thread as the target; or
+     *
+     * <li>Some other thread {@linkplain Thread#interrupt interrupts}
+     * the current thread; or
+     *
+     * <li>The specified waiting time elapses; or
+     *
+     * <li>The call spuriously (that is, for no reason) returns.
+     * </ul>
+     *
+     * <p>This method does <em>not</em> report which of these caused the
+     * method to return. Callers should re-check the conditions which caused
+     * the thread to park in the first place. Callers may also determine,
+     * for example, the interrupt status of the thread, or the elapsed time
+     * upon return.
+     *
+     * @param nanos the maximum number of nanoseconds to wait
+     */
+    public static void parkNanos(long nanos) {
+        if (nanos > 0)
+            U.park(false, nanos);
+    }
+
+    /**
+     * Disables the current thread for thread scheduling purposes, until
+     * the specified deadline, unless the permit is available.
+     *
+     * <p>If the permit is available then it is consumed and the call
+     * returns immediately; otherwise the current thread becomes disabled
+     * for thread scheduling purposes and lies dormant until one of four
+     * things happens:
+     *
+     * <ul>
+     * <li>Some other thread invokes {@link #unpark unpark} with the
+     * current thread as the target; or
+     *
+     * <li>Some other thread {@linkplain Thread#interrupt interrupts}
+     * the current thread; or
+     *
+     * <li>The specified deadline passes; or
+     *
+     * <li>The call spuriously (that is, for no reason) returns.
+     * </ul>
+     *
+     * <p>This method does <em>not</em> report which of these caused the
+     * method to return. Callers should re-check the conditions which caused
+     * the thread to park in the first place. Callers may also determine,
+     * for example, the interrupt status of the thread, or the current time
+     * upon return.
+     *
+     * @param deadline the absolute time, in milliseconds from the Epoch,
+     *        to wait until
+     */
+    public static void parkUntil(long deadline) {
+        U.park(true, deadline);
+    }
+
+    /**
+     * Returns the thread id for the given thread.  We must access
+     * this directly rather than via method Thread.getId() because
+     * getId() has been known to be overridden in ways that do not
+     * preserve unique mappings.
+     */
+    static final long getThreadId(Thread thread) {
+        return U.getLong(thread, TID);
+    }
+
+    // Hotspot implementation via intrinsics API
+    private static final Unsafe U = Unsafe.getUnsafe();
+    private static final long PARKBLOCKER
+        = U.objectFieldOffset(Thread.class, "parkBlocker");
+    private static final long TID
+        = U.objectFieldOffset(Thread.class, "tid");
+
+}
+```
+
+
+
+
+
+### 使用
+
+先 park 再 unpark：
+
+```java
+package mao.t1;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.locks.LockSupport;
+
+/**
+ * Project name(项目名称)：java并发编程_Park和Unpark
+ * Package(包名): mao.t1
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/3
+ * Time(创建时间)： 18:37
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args) throws InterruptedException
+    {
+        Thread thread = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                log.debug("开始");
+                try
+                {
+                    Thread.sleep(1000);
+                }
+                catch (InterruptedException e)
+                {
+                    e.printStackTrace();
+                }
+                log.debug("park");
+                LockSupport.park();
+                log.debug("释放");
+            }
+        }, "t1");
+
+        thread.start();
+
+        Thread.sleep(2000);
+        log.debug("开始释放");
+        LockSupport.unpark(thread);
+
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-03  18:52:05.080  [t1] DEBUG mao.t1.Test:  开始
+2022-09-03  18:52:06.086  [t1] DEBUG mao.t1.Test:  park
+2022-09-03  18:52:07.086  [main] DEBUG mao.t1.Test:  开始释放
+2022-09-03  18:52:07.086  [t1] DEBUG mao.t1.Test:  释放
+```
+
+
+
+先 unpark 再 park：
+
+```java
+package mao.t2;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.locks.LockSupport;
+
+/**
+ * Project name(项目名称)：java并发编程_Park和Unpark
+ * Package(包名): mao.t2
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/3
+ * Time(创建时间)： 18:53
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args) throws InterruptedException
+    {
+        Thread thread = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                log.debug("开始");
+                try
+                {
+                    Thread.sleep(2000);
+                }
+                catch (InterruptedException e)
+                {
+                    e.printStackTrace();
+                }
+                log.debug("park");
+                LockSupport.park();
+                log.debug("释放");
+            }
+        }, "t1");
+
+        thread.start();
+
+        Thread.sleep(1000);
+        log.debug("开始释放");
+        LockSupport.unpark(thread);
+
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-03  18:54:26.733  [t1] DEBUG mao.t2.Test:  开始
+2022-09-03  18:54:27.741  [main] DEBUG mao.t2.Test:  开始释放
+2022-09-03  18:54:28.745  [t1] DEBUG mao.t2.Test:  park
+2022-09-03  18:54:28.745  [t1] DEBUG mao.t2.Test:  释放
+```
+
+
+
+
+
