@@ -7871,3 +7871,69 @@ public class Test
 
 
 
+###  wait和notify
+
+* wait，notify 和 notifyAll 必须配合 Object Monitor 一起使用，而 park，unpark 不必
+* park & unpark 是以线程为单位来【阻塞】和【唤醒】线程，而 notify 只能随机唤醒一个等待线程，notifyAll  是唤醒所有等待线程，就不那么【精确】
+* park & unpark 可以先 unpark，而 wait & notify 不能先 notify
+
+
+
+
+
+### park unpark 原理
+
+每个线程都有自己的一个 Parker 对象，由三部分组成 _counter ， _cond 和 _mutex
+
+* 线程就像一个旅人，Parker 就像他随身携带的背包，条件变量就好比背包中的帐篷。_counter 就好比背包中 的备用干粮（0 为耗尽，1 为充足）
+* 调用 park 就是要看需不需要停下来歇息
+  * 如果备用干粮耗尽，那么钻进帐篷歇息
+  * 如果备用干粮充足，那么不需停留，继续前进
+* 调用 unpark，就好比令干粮充足
+  * 如果这时线程还在帐篷，就唤醒让他继续前进
+  * 如果这时线程还在运行，那么下次他调用 park 时，仅是消耗掉备用干粮，不需停留继续前进。因为背包空间有限，多次调用 unpark 仅会补充一份备用干粮
+
+
+
+
+
+### 线程状态转换
+
+
+
+![image-20220827211854901](img/java并发编程学习笔记/image-20220827211854901.png)
+
+
+
+
+
+### 情况1 NEW --> RUNNABLE
+
+* 当调用 t.start() 方法时，由 NEW --> RUNNABLE
+
+
+
+### 情况2 RUNNABLE <--> WAITING
+
+t 线程用 synchronized(obj) 获取了对象锁后
+
+* 调用 obj.wait() 方法时，t 线程从 RUNNABLE --> WAITING
+* 其它线程调用 obj.notify() ， obj.notifyAll() ， t.interrupt() 时
+  * 竞争锁成功，t 线程从 WAITING --> RUNNABLE
+  * 竞争锁失败，t 线程从 WAITING --> BLOCKED
+
+
+
+
+
+### 情况 3 RUNNABLE <--> WAITING
+
+* 当前线程调用 t.join() 方法时，当前线程从 RUNNABLE --> WAITING。注意是当前线程在t 线程对象的监视器上等待
+* t 线程运行结束，或调用了当前线程的 interrupt() 时，当前线程从 WAITING --> RUNNABLE
+
+
+
+
+
+### 情况 4 RUNNABLE <--> WAITING
+
