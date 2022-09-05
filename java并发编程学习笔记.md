@@ -10030,3 +10030,686 @@ public class Test
 
 ### 公平锁
 
+ReentrantLock 默认是不公平的
+
+
+
+```java
+public ReentrantLock() {
+    sync = new NonfairSync();
+}
+
+/**
+ * Creates an instance of {@code ReentrantLock} with the
+ * given fairness policy.
+ *
+ * @param fair {@code true} if this lock should use a fair ordering policy
+ */
+public ReentrantLock(boolean fair) {
+    sync = fair ? new FairSync() : new NonfairSync();
+}
+```
+
+
+
+```java
+/**
+ * Sync object for fair locks
+ */
+static final class FairSync extends Sync {
+    private static final long serialVersionUID = -3000897897090466540L;
+
+    /**
+     * Acquires only if reentrant or queue is empty.
+     */
+    final boolean initialTryLock() {
+        Thread current = Thread.currentThread();
+        int c = getState();
+        if (c == 0) {
+            if (!hasQueuedThreads() && compareAndSetState(0, 1)) {
+                setExclusiveOwnerThread(current);
+                return true;
+            }
+        } else if (getExclusiveOwnerThread() == current) {
+            if (++c < 0) // overflow
+                throw new Error("Maximum lock count exceeded");
+            setState(c);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Acquires only if thread is first waiter or empty
+     */
+    protected final boolean tryAcquire(int acquires) {
+        if (getState() == 0 && !hasQueuedPredecessors() &&
+            compareAndSetState(0, acquires)) {
+            setExclusiveOwnerThread(Thread.currentThread());
+            return true;
+        }
+        return false;
+    }
+}
+```
+
+
+
+```java
+/**
+ * Sync object for non-fair locks
+ */
+static final class NonfairSync extends Sync {
+    private static final long serialVersionUID = 7316153563782823691L;
+
+    final boolean initialTryLock() {
+        Thread current = Thread.currentThread();
+        if (compareAndSetState(0, 1)) { // first attempt is unguarded
+            setExclusiveOwnerThread(current);
+            return true;
+        } else if (getExclusiveOwnerThread() == current) {
+            int c = getState() + 1;
+            if (c < 0) // overflow
+                throw new Error("Maximum lock count exceeded");
+            setState(c);
+            return true;
+        } else
+            return false;
+    }
+
+    /**
+     * Acquire for non-reentrant cases after initialTryLock prescreen
+     */
+    protected final boolean tryAcquire(int acquires) {
+        if (getState() == 0 && compareAndSetState(0, acquires)) {
+            setExclusiveOwnerThread(Thread.currentThread());
+            return true;
+        }
+        return false;
+    }
+}
+```
+
+
+
+
+
+
+
+非公平锁：
+
+```java
+package mao.t8;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.locks.ReentrantLock;
+
+/**
+ * Project name(项目名称)：java并发编程_ReentrantLock
+ * Package(包名): mao.t8
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/5
+ * Time(创建时间)： 16:52
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 非公平锁
+     */
+    private static final ReentrantLock lock = new ReentrantLock(false);
+
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+
+    public static void main(String[] args) throws InterruptedException
+    {
+        lock.lock();
+        for (int i = 0; i < 50; i++)
+        {
+            new Thread(() ->
+            {
+                lock.lock();
+                try
+                {
+                    log.debug("运行");
+                }
+                finally
+                {
+                    lock.unlock();
+                }
+            }, "t" + i).start();
+        }
+        //1s之后去争抢锁
+        Thread.sleep(1000);
+        new Thread(() ->
+        {
+            log.debug("--------------->开始运行");
+            lock.lock();
+            try
+            {
+                log.debug("---------------->运行");
+            }
+            finally
+            {
+                lock.unlock();
+            }
+        }, "强行插入").start();
+        lock.unlock();
+    }
+
+}
+
+```
+
+
+
+强行插入，有机会在中间输出
+
+```sh
+2022-09-05  17:03:54.751  [t0] DEBUG mao.t8.Test:  运行
+2022-09-05  17:03:54.751  [强行插入] DEBUG mao.t8.Test:  --------------->开始运行
+2022-09-05  17:03:54.752  [强行插入] DEBUG mao.t8.Test:  ---------------->运行
+2022-09-05  17:03:54.753  [t1] DEBUG mao.t8.Test:  运行
+2022-09-05  17:03:54.753  [t2] DEBUG mao.t8.Test:  运行
+2022-09-05  17:03:54.753  [t3] DEBUG mao.t8.Test:  运行
+2022-09-05  17:03:54.753  [t4] DEBUG mao.t8.Test:  运行
+2022-09-05  17:03:54.754  [t5] DEBUG mao.t8.Test:  运行
+2022-09-05  17:03:54.754  [t6] DEBUG mao.t8.Test:  运行
+2022-09-05  17:03:54.754  [t7] DEBUG mao.t8.Test:  运行
+2022-09-05  17:03:54.754  [t8] DEBUG mao.t8.Test:  运行
+2022-09-05  17:03:54.754  [t9] DEBUG mao.t8.Test:  运行
+2022-09-05  17:03:54.755  [t10] DEBUG mao.t8.Test:  运行
+2022-09-05  17:03:54.755  [t11] DEBUG mao.t8.Test:  运行
+2022-09-05  17:03:54.755  [t12] DEBUG mao.t8.Test:  运行
+2022-09-05  17:03:54.755  [t13] DEBUG mao.t8.Test:  运行
+2022-09-05  17:03:54.755  [t14] DEBUG mao.t8.Test:  运行
+2022-09-05  17:03:54.756  [t15] DEBUG mao.t8.Test:  运行
+2022-09-05  17:03:54.756  [t16] DEBUG mao.t8.Test:  运行
+2022-09-05  17:03:54.756  [t17] DEBUG mao.t8.Test:  运行
+2022-09-05  17:03:54.756  [t18] DEBUG mao.t8.Test:  运行
+2022-09-05  17:03:54.756  [t19] DEBUG mao.t8.Test:  运行
+2022-09-05  17:03:54.756  [t20] DEBUG mao.t8.Test:  运行
+2022-09-05  17:03:54.756  [t21] DEBUG mao.t8.Test:  运行
+2022-09-05  17:03:54.757  [t22] DEBUG mao.t8.Test:  运行
+2022-09-05  17:03:54.757  [t23] DEBUG mao.t8.Test:  运行
+2022-09-05  17:03:54.757  [t24] DEBUG mao.t8.Test:  运行
+2022-09-05  17:03:54.757  [t25] DEBUG mao.t8.Test:  运行
+2022-09-05  17:03:54.758  [t26] DEBUG mao.t8.Test:  运行
+2022-09-05  17:03:54.758  [t27] DEBUG mao.t8.Test:  运行
+2022-09-05  17:03:54.758  [t28] DEBUG mao.t8.Test:  运行
+2022-09-05  17:03:54.758  [t29] DEBUG mao.t8.Test:  运行
+2022-09-05  17:03:54.758  [t30] DEBUG mao.t8.Test:  运行
+2022-09-05  17:03:54.759  [t31] DEBUG mao.t8.Test:  运行
+2022-09-05  17:03:54.759  [t32] DEBUG mao.t8.Test:  运行
+2022-09-05  17:03:54.759  [t33] DEBUG mao.t8.Test:  运行
+2022-09-05  17:03:54.759  [t34] DEBUG mao.t8.Test:  运行
+2022-09-05  17:03:54.759  [t35] DEBUG mao.t8.Test:  运行
+2022-09-05  17:03:54.759  [t36] DEBUG mao.t8.Test:  运行
+2022-09-05  17:03:54.760  [t37] DEBUG mao.t8.Test:  运行
+2022-09-05  17:03:54.760  [t38] DEBUG mao.t8.Test:  运行
+2022-09-05  17:03:54.760  [t39] DEBUG mao.t8.Test:  运行
+2022-09-05  17:03:54.760  [t40] DEBUG mao.t8.Test:  运行
+2022-09-05  17:03:54.760  [t41] DEBUG mao.t8.Test:  运行
+2022-09-05  17:03:54.761  [t42] DEBUG mao.t8.Test:  运行
+2022-09-05  17:03:54.761  [t43] DEBUG mao.t8.Test:  运行
+2022-09-05  17:03:54.761  [t44] DEBUG mao.t8.Test:  运行
+2022-09-05  17:03:54.761  [t45] DEBUG mao.t8.Test:  运行
+2022-09-05  17:03:54.761  [t46] DEBUG mao.t8.Test:  运行
+2022-09-05  17:03:54.761  [t47] DEBUG mao.t8.Test:  运行
+2022-09-05  17:03:54.762  [t48] DEBUG mao.t8.Test:  运行
+2022-09-05  17:03:54.762  [t49] DEBUG mao.t8.Test:  运行
+```
+
+
+
+
+
+公平锁实现：
+
+```java
+package mao.t9;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.locks.ReentrantLock;
+
+/**
+ * Project name(项目名称)：java并发编程_ReentrantLock
+ * Package(包名): mao.t9
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/5
+ * Time(创建时间)： 17:01
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 非公平锁
+     */
+    private static final ReentrantLock lock = new ReentrantLock(true);
+
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+
+    public static void main(String[] args) throws InterruptedException
+    {
+        lock.lock();
+        for (int i = 0; i < 50; i++)
+        {
+            new Thread(() ->
+            {
+                lock.lock();
+                try
+                {
+                    log.debug("运行");
+                }
+                finally
+                {
+                    lock.unlock();
+                }
+            }, "t" + i).start();
+        }
+        //1s之后去争抢锁
+        Thread.sleep(1000);
+        new Thread(() ->
+        {
+            log.debug("--------------->开始运行");
+            lock.lock();
+            try
+            {
+                log.debug("---------------->运行");
+            }
+            finally
+            {
+                lock.unlock();
+            }
+        }, "强行插入").start();
+        lock.unlock();
+    }
+
+}
+
+```
+
+
+
+强行插入，总是在最后输出
+
+```sh
+2022-09-05  17:04:51.359  [强行插入] DEBUG mao.t9.Test:  --------------->开始运行
+2022-09-05  17:04:51.359  [t1] DEBUG mao.t9.Test:  运行
+2022-09-05  17:04:51.361  [t2] DEBUG mao.t9.Test:  运行
+2022-09-05  17:04:51.361  [t3] DEBUG mao.t9.Test:  运行
+2022-09-05  17:04:51.362  [t0] DEBUG mao.t9.Test:  运行
+2022-09-05  17:04:51.362  [t4] DEBUG mao.t9.Test:  运行
+2022-09-05  17:04:51.362  [t5] DEBUG mao.t9.Test:  运行
+2022-09-05  17:04:51.362  [t6] DEBUG mao.t9.Test:  运行
+2022-09-05  17:04:51.362  [t7] DEBUG mao.t9.Test:  运行
+2022-09-05  17:04:51.362  [t8] DEBUG mao.t9.Test:  运行
+2022-09-05  17:04:51.363  [t9] DEBUG mao.t9.Test:  运行
+2022-09-05  17:04:51.363  [t10] DEBUG mao.t9.Test:  运行
+2022-09-05  17:04:51.363  [t11] DEBUG mao.t9.Test:  运行
+2022-09-05  17:04:51.363  [t12] DEBUG mao.t9.Test:  运行
+2022-09-05  17:04:51.363  [t13] DEBUG mao.t9.Test:  运行
+2022-09-05  17:04:51.364  [t14] DEBUG mao.t9.Test:  运行
+2022-09-05  17:04:51.364  [t15] DEBUG mao.t9.Test:  运行
+2022-09-05  17:04:51.364  [t16] DEBUG mao.t9.Test:  运行
+2022-09-05  17:04:51.364  [t17] DEBUG mao.t9.Test:  运行
+2022-09-05  17:04:51.364  [t18] DEBUG mao.t9.Test:  运行
+2022-09-05  17:04:51.364  [t19] DEBUG mao.t9.Test:  运行
+2022-09-05  17:04:51.365  [t20] DEBUG mao.t9.Test:  运行
+2022-09-05  17:04:51.365  [t21] DEBUG mao.t9.Test:  运行
+2022-09-05  17:04:51.365  [t22] DEBUG mao.t9.Test:  运行
+2022-09-05  17:04:51.365  [t23] DEBUG mao.t9.Test:  运行
+2022-09-05  17:04:51.365  [t24] DEBUG mao.t9.Test:  运行
+2022-09-05  17:04:51.366  [t25] DEBUG mao.t9.Test:  运行
+2022-09-05  17:04:51.366  [t26] DEBUG mao.t9.Test:  运行
+2022-09-05  17:04:51.366  [t27] DEBUG mao.t9.Test:  运行
+2022-09-05  17:04:51.366  [t28] DEBUG mao.t9.Test:  运行
+2022-09-05  17:04:51.366  [t29] DEBUG mao.t9.Test:  运行
+2022-09-05  17:04:51.366  [t30] DEBUG mao.t9.Test:  运行
+2022-09-05  17:04:51.367  [t31] DEBUG mao.t9.Test:  运行
+2022-09-05  17:04:51.367  [t32] DEBUG mao.t9.Test:  运行
+2022-09-05  17:04:51.367  [t33] DEBUG mao.t9.Test:  运行
+2022-09-05  17:04:51.367  [t34] DEBUG mao.t9.Test:  运行
+2022-09-05  17:04:51.367  [t35] DEBUG mao.t9.Test:  运行
+2022-09-05  17:04:51.368  [t36] DEBUG mao.t9.Test:  运行
+2022-09-05  17:04:51.368  [t37] DEBUG mao.t9.Test:  运行
+2022-09-05  17:04:51.368  [t38] DEBUG mao.t9.Test:  运行
+2022-09-05  17:04:51.368  [t39] DEBUG mao.t9.Test:  运行
+2022-09-05  17:04:51.368  [t40] DEBUG mao.t9.Test:  运行
+2022-09-05  17:04:51.368  [t41] DEBUG mao.t9.Test:  运行
+2022-09-05  17:04:51.368  [t42] DEBUG mao.t9.Test:  运行
+2022-09-05  17:04:51.369  [t43] DEBUG mao.t9.Test:  运行
+2022-09-05  17:04:51.369  [t44] DEBUG mao.t9.Test:  运行
+2022-09-05  17:04:51.369  [t45] DEBUG mao.t9.Test:  运行
+2022-09-05  17:04:51.369  [t46] DEBUG mao.t9.Test:  运行
+2022-09-05  17:04:51.369  [t47] DEBUG mao.t9.Test:  运行
+2022-09-05  17:04:51.369  [t48] DEBUG mao.t9.Test:  运行
+2022-09-05  17:04:51.370  [t49] DEBUG mao.t9.Test:  运行
+2022-09-05  17:04:51.370  [强行插入] DEBUG mao.t9.Test:  ---------------->运行
+```
+
+
+
+**公平锁一般没有必要，因为会降低并发度**
+
+
+
+
+
+### 条件变量
+
+ReentrantLock 的条件变量比 synchronized 强大之处在于，它是支持多个条件变量的，这就好比
+
+* synchronized 是那些不满足条件的线程都在一间休息室等消息
+* 而 ReentrantLock 支持多间休息室，有专门等烟的休息室、专门等早餐的休息室、唤醒时也是按休息室来唤醒
+
+
+
+使用要点：
+
+* await 前需要获得锁
+* await 执行后，会释放锁，进入 conditionObject 等待
+* await 的线程被唤醒（或打断、或超时）重新竞争 lock 锁
+* 竞争 lock 锁成功后，从 await 后继续执行
+
+
+
+
+
+```java
+package mao.t10;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
+
+/**
+ * Project name(项目名称)：java并发编程_ReentrantLock
+ * Package(包名): mao.t10
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/5
+ * Time(创建时间)： 17:13
+ * Version(版本): 1.0
+ * Description(描述)： 条件变量
+ */
+
+public class Test
+{
+    /**
+     * 锁
+     */
+    private static final ReentrantLock LOCK = new ReentrantLock();
+
+    /**
+     * 条件
+     */
+    private static final Condition condition = LOCK.newCondition();
+
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+
+    public static void main(String[] args)
+    {
+        Thread thread = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                log.debug("获取锁");
+                LOCK.lock();
+                try
+                {
+                    log.debug("获取到锁");
+                    Thread.sleep(2000);
+                    log.debug("唤醒");
+                    condition.signal();
+                }
+                catch (InterruptedException e)
+                {
+                    e.printStackTrace();
+                }
+                finally
+                {
+                    log.debug("释放锁");
+                    LOCK.unlock();
+                }
+            }
+        }, "t1");
+
+        log.debug("获取锁");
+        LOCK.lock();
+        log.debug("获取到锁");
+        thread.start();
+        try
+        {
+            Thread.sleep(500);
+            log.debug("await");
+            condition.await();
+            log.debug("被唤醒");
+        }
+        catch (InterruptedException e)
+        {
+            e.printStackTrace();
+        }
+        finally
+        {
+            log.debug("释放锁");
+            LOCK.unlock();
+        }
+    }
+}
+
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-05  17:22:25.566  [main] DEBUG mao.t10.Test:  获取锁
+2022-09-05  17:22:25.568  [main] DEBUG mao.t10.Test:  获取到锁
+2022-09-05  17:22:25.569  [t1] DEBUG mao.t10.Test:  获取锁
+2022-09-05  17:22:26.071  [main] DEBUG mao.t10.Test:  await
+2022-09-05  17:22:26.071  [t1] DEBUG mao.t10.Test:  获取到锁
+2022-09-05  17:22:28.086  [t1] DEBUG mao.t10.Test:  唤醒
+2022-09-05  17:22:28.086  [t1] DEBUG mao.t10.Test:  释放锁
+2022-09-05  17:22:28.086  [main] DEBUG mao.t10.Test:  被唤醒
+2022-09-05  17:22:28.087  [main] DEBUG mao.t10.Test:  释放锁
+```
+
+
+
+
+
+
+
+```java
+package mao.t11;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
+
+/**
+ * Project name(项目名称)：java并发编程_ReentrantLock
+ * Package(包名): mao.t11
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/5
+ * Time(创建时间)： 17:24
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+
+    private static final ReentrantLock lock = new ReentrantLock();
+
+    private static final Condition waitCigaretteQueue = lock.newCondition();
+
+    private static final Condition waitbreakfastQueue = lock.newCondition();
+
+    private static boolean hasCigrette = false;
+
+    private static boolean hasBreakfast = false;
+
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+
+    private static void sendCigarette()
+    {
+        lock.lock();
+        try
+        {
+            log.debug("送烟来了");
+            hasCigrette = true;
+            waitCigaretteQueue.signal();
+        }
+        finally
+        {
+            lock.unlock();
+        }
+    }
+
+    private static void sendBreakfast()
+    {
+        lock.lock();
+        try
+        {
+            log.debug("送早餐来了");
+            hasBreakfast = true;
+            waitbreakfastQueue.signal();
+        }
+        finally
+        {
+            lock.unlock();
+        }
+    }
+
+    public static void main(String[] args) throws InterruptedException
+    {
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                try
+                {
+                    lock.lock();
+                    while (!hasCigrette)
+                    {
+                        try
+                        {
+                            log.debug("开始等待它的烟");
+                            waitCigaretteQueue.await();
+                        }
+                        catch (InterruptedException e)
+                        {
+                            e.printStackTrace();
+                        }
+                    }
+                    log.debug("等到了它的烟");
+                }
+                finally
+                {
+                    lock.unlock();
+                }
+            }
+        }, "t1").start();
+
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                try
+                {
+                    lock.lock();
+                    while (!hasBreakfast)
+                    {
+                        try
+                        {
+                            log.debug("开始等待它的早餐");
+                            waitbreakfastQueue.await();
+                        }
+                        catch (InterruptedException e)
+                        {
+                            e.printStackTrace();
+                        }
+                    }
+                    log.debug("等到了它的早餐");
+                }
+                finally
+                {
+                    lock.unlock();
+                }
+            }
+        }, "t2").start();
+
+        Thread.sleep(1000);
+        sendBreakfast();
+        Thread.sleep(1000);
+        sendCigarette();
+    }
+
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-05  17:34:26.745  [t1] DEBUG mao.t11.Test:  开始等待它的烟
+2022-09-05  17:34:26.747  [t2] DEBUG mao.t11.Test:  开始等待它的早餐
+2022-09-05  17:34:27.746  [main] DEBUG mao.t11.Test:  送早餐来了
+2022-09-05  17:34:27.746  [t2] DEBUG mao.t11.Test:  等到了它的早餐
+2022-09-05  17:34:28.748  [main] DEBUG mao.t11.Test:  送烟来了
+2022-09-05  17:34:28.748  [t1] DEBUG mao.t11.Test:  等到了它的烟
+```
+
+
+
+
+
+
+
+
+
+## 同步模式之顺序控制
+
