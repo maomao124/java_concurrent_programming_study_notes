@@ -9221,3 +9221,439 @@ public class Test
 
 ### 可重入
 
+可重入是指同一个线程如果首次获得了这把锁，那么因为它是这把锁的拥有者，因此有权利再次获取这把锁 
+
+如果是不可重入锁，那么第二次获得锁时，自己也会被锁挡住
+
+
+
+```java
+package mao.t2;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.locks.ReentrantLock;
+
+/**
+ * Project name(项目名称)：java并发编程_ReentrantLock
+ * Package(包名): mao.t2
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/5
+ * Time(创建时间)： 16:05
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 可重入锁
+     */
+    private static final ReentrantLock REENTRANT_LOCK = new ReentrantLock();
+
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    /**
+     * method1
+     */
+    public static void method1()
+    {
+        REENTRANT_LOCK.lock();
+        try
+        {
+            log.debug("execute method1");
+            method2();
+        }
+        finally
+        {
+            REENTRANT_LOCK.unlock();
+        }
+    }
+
+    /**
+     * method2
+     */
+    public static void method2()
+    {
+        REENTRANT_LOCK.lock();
+        try
+        {
+            log.debug("execute method2");
+            method3();
+        }
+        finally
+        {
+            REENTRANT_LOCK.unlock();
+        }
+    }
+
+    /**
+     * method3
+     */
+    public static void method3()
+    {
+        REENTRANT_LOCK.lock();
+        try
+        {
+            log.debug("execute method3");
+        }
+        finally
+        {
+            REENTRANT_LOCK.unlock();
+        }
+
+    }
+
+    public static void main(String[] args)
+    {
+        method1();
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-05  16:09:45.185  [main] DEBUG mao.t2.Test:  execute method1
+2022-09-05  16:09:45.187  [main] DEBUG mao.t2.Test:  execute method2
+2022-09-05  16:09:45.187  [main] DEBUG mao.t2.Test:  execute method3
+```
+
+
+
+
+
+### 可打断
+
+
+
+```java
+package mao.t3;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.locks.ReentrantLock;
+
+/**
+ * Project name(项目名称)：java并发编程_ReentrantLock
+ * Package(包名): mao.t3
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/5
+ * Time(创建时间)： 16:11
+ * Version(版本): 1.0
+ * Description(描述)： 可打断
+ */
+
+public class Test
+{
+    /**
+     * 可重入锁
+     */
+    private static final ReentrantLock REENTRANT_LOCK = new ReentrantLock();
+
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+
+    public static void main(String[] args)
+    {
+        Thread thread = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                log.debug("启动...");
+                try
+                {
+                    REENTRANT_LOCK.lockInterruptibly();
+                }
+                catch (InterruptedException e)
+                {
+                    e.printStackTrace();
+                    log.debug("等锁的过程中被打断");
+                    return;
+                }
+                try
+                {
+                    log.debug("获得了锁");
+                }
+                finally
+                {
+                    log.debug("释放锁");
+                    REENTRANT_LOCK.unlock();
+                }
+            }
+        }, "t1");
+
+        //主线程获取锁
+        REENTRANT_LOCK.lock();
+        log.debug("main线程获得了锁");
+        thread.start();
+        try
+        {
+            Thread.sleep(1000);
+            //打断
+            log.debug("执行打断");
+            thread.interrupt();
+        }
+        catch (InterruptedException e)
+        {
+            e.printStackTrace();
+        }
+        finally
+        {
+            REENTRANT_LOCK.unlock();
+        }
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-05  16:18:42.110  [main] DEBUG mao.t3.Test:  main线程获得了锁
+2022-09-05  16:18:42.112  [t1] DEBUG mao.t3.Test:  启动...
+2022-09-05  16:18:43.113  [main] DEBUG mao.t3.Test:  执行打断
+2022-09-05  16:18:43.114  [t1] DEBUG mao.t3.Test:  等锁的过程中被打断
+java.lang.InterruptedException
+	at java.base/java.util.concurrent.locks.AbstractQueuedSynchronizer.acquireInterruptibly(AbstractQueuedSynchronizer.java:958)
+	at java.base/java.util.concurrent.locks.ReentrantLock$Sync.lockInterruptibly(ReentrantLock.java:161)
+	at java.base/java.util.concurrent.locks.ReentrantLock.lockInterruptibly(ReentrantLock.java:372)
+	at mao.t3.Test$1.run(Test.java:44)
+	at java.base/java.lang.Thread.run(Thread.java:831)
+```
+
+
+
+
+
+如果是不可中断模式，那么即使使用了 interrupt 也不会让等待中断
+
+
+
+```java
+package mao.t4;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.locks.ReentrantLock;
+
+/**
+ * Project name(项目名称)：java并发编程_ReentrantLock
+ * Package(包名): mao.t4
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/5
+ * Time(创建时间)： 16:19
+ * Version(版本): 1.0
+ * Description(描述)： 如果是不可中断模式，那么即使使用了 interrupt 也不会让等待中断
+ */
+
+public class Test
+{
+    /**
+     * 可重入锁
+     */
+    private static final ReentrantLock REENTRANT_LOCK = new ReentrantLock();
+
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+
+    public static void main(String[] args)
+    {
+        Thread thread = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                log.debug("启动...");
+                REENTRANT_LOCK.lock();
+                try
+                {
+                    log.debug("获得了锁");
+                }
+                finally
+                {
+                    log.debug("释放锁");
+                    REENTRANT_LOCK.unlock();
+                }
+            }
+        }, "t1");
+
+        //主线程获取锁
+        REENTRANT_LOCK.lock();
+        log.debug("main线程获得了锁");
+        thread.start();
+        try
+        {
+            Thread.sleep(1000);
+            //打断
+            log.debug("执行打断");
+            thread.interrupt();
+            Thread.sleep(2000);
+        }
+        catch (InterruptedException e)
+        {
+            e.printStackTrace();
+        }
+        finally
+        {
+            log.debug("释放锁");
+            REENTRANT_LOCK.unlock();
+        }
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-05  16:24:00.274  [main] DEBUG mao.t4.Test:  main线程获得了锁
+2022-09-05  16:24:00.276  [t1] DEBUG mao.t4.Test:  启动...
+2022-09-05  16:24:01.277  [main] DEBUG mao.t4.Test:  执行打断
+2022-09-05  16:24:03.289  [main] DEBUG mao.t4.Test:  释放锁
+2022-09-05  16:24:03.289  [t1] DEBUG mao.t4.Test:  获得了锁
+2022-09-05  16:24:03.289  [t1] DEBUG mao.t4.Test:  释放锁
+```
+
+
+
+
+
+
+
+### 锁超时
+
+
+
+**立刻失败：**
+
+
+
+```java
+package mao.t5;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.locks.ReentrantLock;
+
+/**
+ * Project name(项目名称)：java并发编程_ReentrantLock
+ * Package(包名): mao.t5
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/5
+ * Time(创建时间)： 16:25
+ * Version(版本): 1.0
+ * Description(描述)： 锁超时 , 立刻失败
+ */
+
+public class Test
+{
+    /**
+     * 可重入锁
+     */
+    private static final ReentrantLock REENTRANT_LOCK = new ReentrantLock();
+
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args)
+    {
+        Thread thread = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                try
+                {
+                    Thread.sleep(500);
+                }
+                catch (InterruptedException e)
+                {
+                    e.printStackTrace();
+                }
+                boolean lock = REENTRANT_LOCK.tryLock();
+                if (!lock)
+                {
+                    log.debug("获取锁失败，直接返回");
+                    return;
+                }
+                try
+                {
+                    log.debug("获取锁成功");
+                }
+                finally
+                {
+                    log.debug("释放锁");
+                    REENTRANT_LOCK.unlock();
+                }
+            }
+        }, "t1");
+
+        REENTRANT_LOCK.lock();
+        log.debug("获得锁");
+        thread.start();
+        try
+        {
+            Thread.sleep(2000);
+        }
+        catch (InterruptedException e)
+        {
+            e.printStackTrace();
+        }
+        finally
+        {
+            log.debug("释放锁");
+            REENTRANT_LOCK.unlock();
+        }
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-05  16:31:22.420  [main] DEBUG mao.t5.Test:  获得锁
+2022-09-05  16:31:22.930  [t1] DEBUG mao.t5.Test:  获取锁失败，直接返回
+2022-09-05  16:31:24.437  [main] DEBUG mao.t5.Test:  释放锁
+```
+
+
+
+**超时失败：**
+
+
+
