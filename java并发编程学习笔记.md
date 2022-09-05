@@ -9657,3 +9657,376 @@ public class Test
 
 
 
+```java
+package mao.t6;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
+
+/**
+ * Project name(项目名称)：java并发编程_ReentrantLock
+ * Package(包名): mao.t6
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/5
+ * Time(创建时间)： 16:35
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 可重入锁
+     */
+    private static final ReentrantLock REENTRANT_LOCK = new ReentrantLock();
+
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args)
+    {
+        Thread thread = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                try
+                {
+                    Thread.sleep(500);
+                }
+                catch (InterruptedException e)
+                {
+                    e.printStackTrace();
+                }
+                boolean lock = false;
+                try
+                {
+                    log.debug("开始尝试获取锁，超时时间为500毫秒");
+                    lock = REENTRANT_LOCK.tryLock(500, TimeUnit.MILLISECONDS);
+                }
+                catch (InterruptedException e)
+                {
+                    e.printStackTrace();
+                }
+                if (!lock)
+                {
+                    log.debug("获取锁失败，直接返回");
+                    return;
+                }
+                try
+                {
+                    log.debug("获取锁成功");
+                }
+                finally
+                {
+                    log.debug("释放锁");
+                    REENTRANT_LOCK.unlock();
+                }
+            }
+        }, "t1");
+
+        REENTRANT_LOCK.lock();
+        log.debug("获得锁");
+        thread.start();
+        try
+        {
+            Thread.sleep(2000);
+        }
+        catch (InterruptedException e)
+        {
+            e.printStackTrace();
+        }
+        finally
+        {
+            log.debug("释放锁");
+            REENTRANT_LOCK.unlock();
+        }
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-05  16:40:38.206  [main] DEBUG mao.t6.Test:  获得锁
+2022-09-05  16:40:38.709  [t1] DEBUG mao.t6.Test:  开始尝试获取锁，超时时间为500毫秒
+2022-09-05  16:40:39.210  [t1] DEBUG mao.t6.Test:  获取锁失败，直接返回
+2022-09-05  16:40:40.222  [main] DEBUG mao.t6.Test:  释放锁
+```
+
+
+
+
+
+### 哲学家就餐问题
+
+可以用ReentrantLock的tryLock方法解决死锁问题
+
+
+
+```java
+package mao.t7;
+
+import java.util.concurrent.locks.ReentrantLock;
+
+/**
+ * Project name(项目名称)：java并发编程_ReentrantLock
+ * Package(包名): mao.t7
+ * Class(类名): Chopstick
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/5
+ * Time(创建时间)： 16:42
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Chopstick extends ReentrantLock
+{
+    /**
+     * 筷子名字
+     */
+    String name;
+
+    /**
+     * 筷子
+     *
+     * @param name 名字
+     */
+    public Chopstick(String name)
+    {
+        this.name = name;
+    }
+
+    /**
+     * 字符串
+     *
+     * @return {@link String}
+     */
+    @Override
+    public String toString()
+    {
+        return "筷子" + name;
+    }
+}
+```
+
+
+
+
+
+```java
+package mao.t7;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Project name(项目名称)：java并发编程_ReentrantLock
+ * Package(包名): mao.t7
+ * Class(类名): Philosopher
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/5
+ * Time(创建时间)： 16:42
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Philosopher extends Thread
+{
+    private static final Logger log = LoggerFactory.getLogger(Philosopher.class);
+
+    /**
+     * 左边筷子
+     */
+    final Chopstick leftChopstick;
+
+    /**
+     * 右边筷子
+     */
+    final Chopstick rightChopstick;
+
+    /**
+     * 哲学家
+     *
+     * @param name           线程名字，也就是哲学家名字
+     * @param leftChopstick  左边筷子
+     * @param rightChopstick 右边筷子
+     */
+    public Philosopher(String name, Chopstick leftChopstick, Chopstick rightChopstick)
+    {
+        super(name);
+        this.leftChopstick = leftChopstick;
+        this.rightChopstick = rightChopstick;
+    }
+
+    /**
+     * 吃饭
+     */
+    private void eat()
+    {
+        log.debug("eating...");
+        try
+        {
+            Thread.sleep(200);
+        }
+        catch (InterruptedException e)
+        {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public void run()
+    {
+        while (true)
+        {
+            //尝试获得左手筷子
+            if (leftChopstick.tryLock())
+            {
+                try
+                {
+                    //尝试获得右手筷子
+                    if (rightChopstick.tryLock())
+                    {
+                        try
+                        {
+                            eat();
+                        }
+                        finally
+                        {
+                            //放下右手筷子
+                            rightChopstick.unlock();
+                        }
+                    }
+                }
+                finally
+                {
+                    //放下左手筷子
+                    leftChopstick.unlock();
+                }
+            }
+        }
+    }
+}
+```
+
+
+
+
+
+```java
+package mao.t7;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Project name(项目名称)：java并发编程_ReentrantLock
+ * Package(包名): mao.t7
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/5
+ * Time(创建时间)： 16:42
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args)
+    {
+        Chopstick c1 = new Chopstick("1");
+        Chopstick c2 = new Chopstick("2");
+        Chopstick c3 = new Chopstick("3");
+        Chopstick c4 = new Chopstick("4");
+        Chopstick c5 = new Chopstick("5");
+        new Philosopher("苏格拉底", c1, c2).start();
+        new Philosopher("柏拉图", c2, c3).start();
+        new Philosopher("亚里士多德", c3, c4).start();
+        new Philosopher("赫拉克利特", c4, c5).start();
+        new Philosopher("阿基米德", c5, c1).start();
+
+        Runtime.getRuntime().addShutdownHook(new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                log.info("程序退出");
+            }
+        }, "ShutdownHook"));
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-05  16:50:10.430  [亚里士多德] DEBUG mao.t7.Philosopher:  eating...
+2022-09-05  16:50:10.430  [苏格拉底] DEBUG mao.t7.Philosopher:  eating...
+2022-09-05  16:50:10.637  [柏拉图] DEBUG mao.t7.Philosopher:  eating...
+2022-09-05  16:50:10.637  [阿基米德] DEBUG mao.t7.Philosopher:  eating...
+2022-09-05  16:50:10.841  [苏格拉底] DEBUG mao.t7.Philosopher:  eating...
+2022-09-05  16:50:10.841  [赫拉克利特] DEBUG mao.t7.Philosopher:  eating...
+2022-09-05  16:50:11.047  [阿基米德] DEBUG mao.t7.Philosopher:  eating...
+2022-09-05  16:50:11.047  [亚里士多德] DEBUG mao.t7.Philosopher:  eating...
+2022-09-05  16:50:11.255  [赫拉克利特] DEBUG mao.t7.Philosopher:  eating...
+2022-09-05  16:50:11.255  [苏格拉底] DEBUG mao.t7.Philosopher:  eating...
+2022-09-05  16:50:11.461  [赫拉克利特] DEBUG mao.t7.Philosopher:  eating...
+2022-09-05  16:50:11.461  [柏拉图] DEBUG mao.t7.Philosopher:  eating...
+2022-09-05  16:50:11.667  [苏格拉底] DEBUG mao.t7.Philosopher:  eating...
+2022-09-05  16:50:11.667  [亚里士多德] DEBUG mao.t7.Philosopher:  eating...
+2022-09-05  16:50:11.874  [苏格拉底] DEBUG mao.t7.Philosopher:  eating...
+2022-09-05  16:50:11.874  [赫拉克利特] DEBUG mao.t7.Philosopher:  eating...
+2022-09-05  16:50:12.077  [亚里士多德] DEBUG mao.t7.Philosopher:  eating...
+2022-09-05  16:50:12.077  [阿基米德] DEBUG mao.t7.Philosopher:  eating...
+2022-09-05  16:50:12.283  [柏拉图] DEBUG mao.t7.Philosopher:  eating...
+2022-09-05  16:50:12.283  [赫拉克利特] DEBUG mao.t7.Philosopher:  eating...
+2022-09-05  16:50:12.489  [阿基米德] DEBUG mao.t7.Philosopher:  eating...
+2022-09-05  16:50:12.489  [柏拉图] DEBUG mao.t7.Philosopher:  eating...
+2022-09-05  16:50:12.697  [苏格拉底] DEBUG mao.t7.Philosopher:  eating...
+2022-09-05  16:50:12.697  [赫拉克利特] DEBUG mao.t7.Philosopher:  eating...
+2022-09-05  16:50:12.903  [柏拉图] DEBUG mao.t7.Philosopher:  eating...
+2022-09-05  16:50:12.903  [赫拉克利特] DEBUG mao.t7.Philosopher:  eating...
+2022-09-05  16:50:13.107  [亚里士多德] DEBUG mao.t7.Philosopher:  eating...
+2022-09-05  16:50:13.107  [苏格拉底] DEBUG mao.t7.Philosopher:  eating...
+2022-09-05  16:50:13.312  [柏拉图] DEBUG mao.t7.Philosopher:  eating...
+2022-09-05  16:50:13.312  [阿基米德] DEBUG mao.t7.Philosopher:  eating...
+2022-09-05  16:50:13.519  [阿基米德] DEBUG mao.t7.Philosopher:  eating...
+2022-09-05  16:50:13.519  [亚里士多德] DEBUG mao.t7.Philosopher:  eating...
+2022-09-05  16:50:13.725  [赫拉克利特] DEBUG mao.t7.Philosopher:  eating...
+2022-09-05  16:50:13.725  [柏拉图] DEBUG mao.t7.Philosopher:  eating...
+2022-09-05  16:50:13.930  [阿基米德] DEBUG mao.t7.Philosopher:  eating...
+...
+```
+
+
+
+
+
+
+
+### 公平锁
+
