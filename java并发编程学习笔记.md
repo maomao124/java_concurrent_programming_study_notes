@@ -8576,3 +8576,443 @@ PS C:\Users\mao\Desktop>
 
 
 
+
+
+```java
+package mao.t2;
+
+/**
+ * Project name(项目名称)：java并发编程_活跃性
+ * Package(包名): mao.t2
+ * Class(类名): Chopstick
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/5
+ * Time(创建时间)： 11:42
+ * Version(版本): 1.0
+ * Description(描述)： 筷子类
+ */
+
+public class Chopstick
+{
+    /**
+     * 筷子名字
+     */
+    String name;
+
+    /**
+     * 筷子
+     *
+     * @param name 名字
+     */
+    public Chopstick(String name)
+    {
+        this.name = name;
+    }
+
+    /**
+     * 字符串
+     *
+     * @return {@link String}
+     */
+    @Override
+    public String toString()
+    {
+        return "筷子" + name;
+    }
+}
+```
+
+
+
+```java
+package mao.t2;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Project name(项目名称)：java并发编程_活跃性
+ * Package(包名): mao.t2
+ * Class(类名): Philosopher
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/5
+ * Time(创建时间)： 11:44
+ * Version(版本): 1.0
+ * Description(描述)：哲学家
+ */
+
+public class Philosopher extends Thread
+{
+    private static final Logger log = LoggerFactory.getLogger(Philosopher.class);
+
+    /**
+     * 左边筷子
+     */
+    final Chopstick leftChopstick;
+
+    /**
+     * 右边筷子
+     */
+    final Chopstick rightChopstick;
+
+    /**
+     * 哲学家
+     *
+     * @param name           线程名字，也就是哲学家名字
+     * @param leftChopstick  左边筷子
+     * @param rightChopstick 右边筷子
+     */
+    public Philosopher(String name, Chopstick leftChopstick, Chopstick rightChopstick)
+    {
+        super(name);
+        this.leftChopstick = leftChopstick;
+        this.rightChopstick = rightChopstick;
+    }
+
+    /**
+     * 吃饭
+     */
+    private void eat()
+    {
+        log.debug("eating...");
+        try
+        {
+            Thread.sleep(1000);
+        }
+        catch (InterruptedException e)
+        {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public void run()
+    {
+        while (true)
+        {
+            // 获得左手筷子
+            synchronized (leftChopstick)
+            {
+                // 获得右手筷子
+                synchronized (rightChopstick)
+                {
+                    // 吃饭
+                    eat();
+                }
+                // 放下右手筷子
+            }
+            // 放下左手筷子
+        }
+    }
+}
+```
+
+
+
+
+
+```java
+package mao.t2;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Project name(项目名称)：java并发编程_活跃性
+ * Package(包名): mao.t2
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/5
+ * Time(创建时间)： 11:42
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args)
+    {
+        Chopstick c1 = new Chopstick("1");
+        Chopstick c2 = new Chopstick("2");
+        Chopstick c3 = new Chopstick("3");
+        Chopstick c4 = new Chopstick("4");
+        Chopstick c5 = new Chopstick("5");
+        new Philosopher("苏格拉底", c1, c2).start();
+        new Philosopher("柏拉图", c2, c3).start();
+        new Philosopher("亚里士多德", c3, c4).start();
+        new Philosopher("赫拉克利特", c4, c5).start();
+        new Philosopher("阿基米德", c5, c1).start();
+
+        Runtime.getRuntime().addShutdownHook(new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                log.info("程序退出");
+            }
+        }, "ShutdownHook"));
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-05  11:55:37.333  [亚里士多德] DEBUG mao.t2.Philosopher:  eating...
+2022-09-05  11:55:37.333  [苏格拉底] DEBUG mao.t2.Philosopher:  eating...
+2022-09-05  11:55:38.337  [苏格拉底] DEBUG mao.t2.Philosopher:  eating...
+2022-09-05  11:55:38.337  [亚里士多德] DEBUG mao.t2.Philosopher:  eating...
+2022-09-05  11:55:39.339  [苏格拉底] DEBUG mao.t2.Philosopher:  eating...
+2022-09-05  11:55:39.339  [亚里士多德] DEBUG mao.t2.Philosopher:  eating...
+2022-09-05  11:55:40.341  [苏格拉底] DEBUG mao.t2.Philosopher:  eating...
+2022-09-05  11:55:40.341  [亚里士多德] DEBUG mao.t2.Philosopher:  eating...
+2022-09-05  11:55:41.349  [亚里士多德] DEBUG mao.t2.Philosopher:  eating...
+2022-09-05  11:55:42.350  [亚里士多德] DEBUG mao.t2.Philosopher:  eating...
+2022-09-05  11:55:43.359  [亚里士多德] DEBUG mao.t2.Philosopher:  eating...
+2022-09-05  11:55:44.372  [亚里士多德] DEBUG mao.t2.Philosopher:  eating...
+2022-09-05  11:55:45.374  [亚里士多德] DEBUG mao.t2.Philosopher:  eating...
+2022-09-05  11:55:46.384  [亚里士多德] DEBUG mao.t2.Philosopher:  eating...
+2022-09-05  11:55:47.399  [亚里士多德] DEBUG mao.t2.Philosopher:  eating...
+2022-09-05  11:55:48.400  [亚里士多德] DEBUG mao.t2.Philosopher:  eating...
+2022-09-05  11:55:49.413  [亚里士多德] DEBUG mao.t2.Philosopher:  eating...
+2022-09-05  11:55:50.427  [亚里士多德] DEBUG mao.t2.Philosopher:  eating...
+```
+
+
+
+没有向下运行了
+
+
+
+检测死锁
+
+
+
+```sh
+PS C:\Users\mao\Desktop> jps
+14704 Launcher
+4116 Jps
+12812 RemoteMavenServer36
+2844
+3132 Test
+PS C:\Users\mao\Desktop> jstack.exe 3132
+2022-09-05 11:57:54
+Full thread dump OpenJDK 64-Bit Server VM (16.0.2+7-67 mixed mode, sharing):
+
+Threads class SMR info:
+_java_thread_list=0x0000023eb9e5aca0, length=18, elements={
+0x0000023eb88f4c40, 0x0000023eb88f5b00, 0x0000023eb890cc50, 0x0000023eb8911980,
+0x0000023eb8912290, 0x0000023eb8912ba0, 0x0000023eb8918e90, 0x0000023eb8919980,
+0x0000023eb9410060, 0x0000023eb88d5090, 0x0000023eb965a8e0, 0x0000023eb965ae00,
+0x0000023eb9ddab50, 0x0000023eb9ddb070, 0x0000023eb9ded010, 0x0000023eb9ded530,
+0x0000023eb9df1a60, 0x0000023e931ac200
+}
+
+"Reference Handler" #2 daemon prio=10 os_prio=2 cpu=0.00ms elapsed=138.10s tid=0x0000023eb88f4c40 nid=0x3514 waiting on condition  [0x000000d9f41ff000]
+   java.lang.Thread.State: RUNNABLE
+        at java.lang.ref.Reference.waitForReferencePendingList(java.base@16.0.2/Native Method)
+        at java.lang.ref.Reference.processPendingReferences(java.base@16.0.2/Reference.java:243)
+        at java.lang.ref.Reference$ReferenceHandler.run(java.base@16.0.2/Reference.java:215)
+
+"Finalizer" #3 daemon prio=8 os_prio=1 cpu=0.00ms elapsed=138.10s tid=0x0000023eb88f5b00 nid=0xc10 in Object.wait()  [0x000000d9f42ff000]
+   java.lang.Thread.State: WAITING (on object monitor)
+        at java.lang.Object.wait(java.base@16.0.2/Native Method)
+        - waiting on <0x000000070f602c18> (a java.lang.ref.ReferenceQueue$Lock)
+        at java.lang.ref.ReferenceQueue.remove(java.base@16.0.2/ReferenceQueue.java:155)
+        - locked <0x000000070f602c18> (a java.lang.ref.ReferenceQueue$Lock)
+        at java.lang.ref.ReferenceQueue.remove(java.base@16.0.2/ReferenceQueue.java:176)
+        at java.lang.ref.Finalizer$FinalizerThread.run(java.base@16.0.2/Finalizer.java:171)
+
+"Signal Dispatcher" #4 daemon prio=9 os_prio=2 cpu=0.00ms elapsed=138.09s tid=0x0000023eb890cc50 nid=0x4290 runnable  [0x0000000000000000]
+   java.lang.Thread.State: RUNNABLE
+
+"Attach Listener" #5 daemon prio=5 os_prio=2 cpu=15.62ms elapsed=138.09s tid=0x0000023eb8911980 nid=0x4398 waiting on condition  [0x0000000000000000]
+   java.lang.Thread.State: RUNNABLE
+
+"Service Thread" #6 daemon prio=9 os_prio=0 cpu=0.00ms elapsed=138.09s tid=0x0000023eb8912290 nid=0x2aec runnable  [0x0000000000000000]
+   java.lang.Thread.State: RUNNABLE
+
+"Monitor Deflation Thread" #7 daemon prio=9 os_prio=0 cpu=0.00ms elapsed=138.09s tid=0x0000023eb8912ba0 nid=0x37d0 runnable  [0x0000000000000000]
+   java.lang.Thread.State: RUNNABLE
+
+"C2 CompilerThread0" #8 daemon prio=9 os_prio=2 cpu=296.88ms elapsed=138.09s tid=0x0000023eb8918e90 nid=0x1350 waiting on condition  [0x0000000000000000]
+   java.lang.Thread.State: RUNNABLE
+   No compile task
+
+"C1 CompilerThread0" #16 daemon prio=9 os_prio=2 cpu=109.38ms elapsed=138.09s tid=0x0000023eb8919980 nid=0x3f68 waiting on condition  [0x0000000000000000]
+   java.lang.Thread.State: RUNNABLE
+   No compile task
+
+"Sweeper thread" #20 daemon prio=9 os_prio=2 cpu=0.00ms elapsed=138.09s tid=0x0000023eb9410060 nid=0x2758 runnable  [0x0000000000000000]
+   java.lang.Thread.State: RUNNABLE
+
+"Common-Cleaner" #21 daemon prio=8 os_prio=1 cpu=0.00ms elapsed=138.07s tid=0x0000023eb88d5090 nid=0x2a30 in Object.wait()  [0x000000d9f4afe000]
+   java.lang.Thread.State: TIMED_WAITING (on object monitor)
+        at java.lang.Object.wait(java.base@16.0.2/Native Method)
+        - waiting on <0x000000070f6041c0> (a java.lang.ref.ReferenceQueue$Lock)
+        at java.lang.ref.ReferenceQueue.remove(java.base@16.0.2/ReferenceQueue.java:155)
+        - locked <0x000000070f6041c0> (a java.lang.ref.ReferenceQueue$Lock)
+        at jdk.internal.ref.CleanerImpl.run(java.base@16.0.2/CleanerImpl.java:140)
+        at java.lang.Thread.run(java.base@16.0.2/Thread.java:831)
+        at jdk.internal.misc.InnocuousThread.run(java.base@16.0.2/InnocuousThread.java:134)
+
+"Monitor Ctrl-Break" #22 daemon prio=5 os_prio=0 cpu=15.62ms elapsed=138.03s tid=0x0000023eb965a8e0 nid=0x3c3c runnable  [0x000000d9f4efe000]
+   java.lang.Thread.State: RUNNABLE
+        at sun.nio.ch.SocketDispatcher.read0(java.base@16.0.2/Native Method)
+        at sun.nio.ch.SocketDispatcher.read(java.base@16.0.2/SocketDispatcher.java:46)
+        at sun.nio.ch.NioSocketImpl.tryRead(java.base@16.0.2/NioSocketImpl.java:261)
+        at sun.nio.ch.NioSocketImpl.implRead(java.base@16.0.2/NioSocketImpl.java:312)
+        at sun.nio.ch.NioSocketImpl.read(java.base@16.0.2/NioSocketImpl.java:350)
+        at sun.nio.ch.NioSocketImpl$1.read(java.base@16.0.2/NioSocketImpl.java:803)
+        at java.net.Socket$SocketInputStream.read(java.base@16.0.2/Socket.java:976)
+        at sun.nio.cs.StreamDecoder.readBytes(java.base@16.0.2/StreamDecoder.java:297)
+        at sun.nio.cs.StreamDecoder.implRead(java.base@16.0.2/StreamDecoder.java:339)
+        at sun.nio.cs.StreamDecoder.read(java.base@16.0.2/StreamDecoder.java:188)
+        - locked <0x000000070f601d08> (a java.io.InputStreamReader)
+        at java.io.InputStreamReader.read(java.base@16.0.2/InputStreamReader.java:178)
+        at java.io.BufferedReader.fill(java.base@16.0.2/BufferedReader.java:161)
+        at java.io.BufferedReader.readLine(java.base@16.0.2/BufferedReader.java:329)
+        - locked <0x000000070f601d08> (a java.io.InputStreamReader)
+        at java.io.BufferedReader.readLine(java.base@16.0.2/BufferedReader.java:396)
+        at com.intellij.rt.execution.application.AppMainV2$1.run(AppMainV2.java:49)
+
+"Notification Thread" #23 daemon prio=9 os_prio=0 cpu=0.00ms elapsed=138.03s tid=0x0000023eb965ae00 nid=0x2740 runnable  [0x0000000000000000]
+   java.lang.Thread.State: RUNNABLE
+
+"苏格拉底" #27 prio=5 os_prio=0 cpu=15.62ms elapsed=137.56s tid=0x0000023eb9ddab50 nid=0x1024 waiting for monitor entry  [0x000000d9f57ff000]
+   java.lang.Thread.State: BLOCKED (on object monitor)
+        at mao.t2.Philosopher.run(Philosopher.java:75)
+        - waiting to lock <0x0000000710249a28> (a mao.t2.Chopstick)
+        - locked <0x0000000710249a18> (a mao.t2.Chopstick)
+
+"柏拉图" #28 prio=5 os_prio=0 cpu=0.00ms elapsed=137.56s tid=0x0000023eb9ddb070 nid=0x47c8 waiting for monitor entry  [0x000000d9f58ff000]
+   java.lang.Thread.State: BLOCKED (on object monitor)
+        at mao.t2.Philosopher.run(Philosopher.java:75)
+        - waiting to lock <0x0000000710249a38> (a mao.t2.Chopstick)
+        - locked <0x0000000710249a28> (a mao.t2.Chopstick)
+
+"亚里士多德" #29 prio=5 os_prio=0 cpu=0.00ms elapsed=137.56s tid=0x0000023eb9ded010 nid=0x310c waiting for monitor entry  [0x000000d9f59ff000]
+   java.lang.Thread.State: BLOCKED (on object monitor)
+        at mao.t2.Philosopher.run(Philosopher.java:75)
+        - waiting to lock <0x0000000710249a48> (a mao.t2.Chopstick)
+        - locked <0x0000000710249a38> (a mao.t2.Chopstick)
+
+"赫拉克利特" #30 prio=5 os_prio=0 cpu=0.00ms elapsed=137.56s tid=0x0000023eb9ded530 nid=0x1078 waiting for monitor entry  [0x000000d9f5aff000]
+   java.lang.Thread.State: BLOCKED (on object monitor)
+        at mao.t2.Philosopher.run(Philosopher.java:75)
+        - waiting to lock <0x0000000710249a58> (a mao.t2.Chopstick)
+        - locked <0x0000000710249a48> (a mao.t2.Chopstick)
+
+"阿基米德" #31 prio=5 os_prio=0 cpu=0.00ms elapsed=137.56s tid=0x0000023eb9df1a60 nid=0xfdc waiting for monitor entry  [0x000000d9f5bfe000]
+   java.lang.Thread.State: BLOCKED (on object monitor)
+        at mao.t2.Philosopher.run(Philosopher.java:75)
+        - waiting to lock <0x0000000710249a18> (a mao.t2.Chopstick)
+        - locked <0x0000000710249a58> (a mao.t2.Chopstick)
+
+"DestroyJavaVM" #33 prio=5 os_prio=0 cpu=515.62ms elapsed=137.56s tid=0x0000023e931ac200 nid=0x50c waiting on condition  [0x0000000000000000]
+   java.lang.Thread.State: RUNNABLE
+
+"VM Thread" os_prio=2 cpu=0.00ms elapsed=138.10s tid=0x0000023eb88efff0 nid=0x294c runnable
+
+"GC Thread#0" os_prio=2 cpu=0.00ms elapsed=138.11s tid=0x0000023e931ff040 nid=0xfe4 runnable
+
+"GC Thread#1" os_prio=2 cpu=0.00ms elapsed=137.80s tid=0x0000023eb9c958e0 nid=0xc4 runnable
+
+"GC Thread#2" os_prio=2 cpu=0.00ms elapsed=137.80s tid=0x0000023eb9c95bf0 nid=0x30e8 runnable
+
+"GC Thread#3" os_prio=2 cpu=0.00ms elapsed=137.80s tid=0x0000023eb9c95f00 nid=0x2500 runnable
+
+"GC Thread#4" os_prio=2 cpu=0.00ms elapsed=137.80s tid=0x0000023eb9c96620 nid=0x46d0 runnable
+
+"GC Thread#5" os_prio=2 cpu=0.00ms elapsed=137.80s tid=0x0000023eb9c975c0 nid=0x470 runnable
+
+"G1 Main Marker" os_prio=2 cpu=0.00ms elapsed=138.11s tid=0x0000023e9320ff90 nid=0x22e4 runnable
+
+"G1 Conc#0" os_prio=2 cpu=0.00ms elapsed=138.11s tid=0x0000023e932111a0 nid=0x24d8 runnable
+
+"G1 Refine#0" os_prio=2 cpu=0.00ms elapsed=138.10s tid=0x0000023e9327c5d0 nid=0x4d8 runnable
+
+"G1 Service" os_prio=2 cpu=0.00ms elapsed=138.10s tid=0x0000023e9327d050 nid=0x3760 runnable
+
+"VM Periodic Task Thread" os_prio=2 cpu=0.00ms elapsed=138.03s tid=0x0000023eb965b7a0 nid=0x3190 waiting on condition
+
+JNI global refs: 23, weak refs: 0
+
+
+Found one Java-level deadlock:
+=============================
+"苏格拉底":
+  waiting to lock monitor 0x0000023eb9dc11b0 (object 0x0000000710249a28, a mao.t2.Chopstick),
+  which is held by "柏拉图"
+
+"柏拉图":
+  waiting to lock monitor 0x0000023eb9dc10d0 (object 0x0000000710249a38, a mao.t2.Chopstick),
+  which is held by "亚里士多德"
+
+"亚里士多德":
+  waiting to lock monitor 0x0000023eb9dc2a30 (object 0x0000000710249a48, a mao.t2.Chopstick),
+  which is held by "赫拉克利特"
+
+"赫拉克利特":
+  waiting to lock monitor 0x0000023eb9dc1a70 (object 0x0000000710249a58, a mao.t2.Chopstick),
+  which is held by "阿基米德"
+
+"阿基米德":
+  waiting to lock monitor 0x0000023eb9dc16f0 (object 0x0000000710249a18, a mao.t2.Chopstick),
+  which is held by "苏格拉底"
+
+Java stack information for the threads listed above:
+===================================================
+"苏格拉底":
+        at mao.t2.Philosopher.run(Philosopher.java:75)
+        - waiting to lock <0x0000000710249a28> (a mao.t2.Chopstick)
+        - locked <0x0000000710249a18> (a mao.t2.Chopstick)
+"柏拉图":
+        at mao.t2.Philosopher.run(Philosopher.java:75)
+        - waiting to lock <0x0000000710249a38> (a mao.t2.Chopstick)
+        - locked <0x0000000710249a28> (a mao.t2.Chopstick)
+"亚里士多德":
+        at mao.t2.Philosopher.run(Philosopher.java:75)
+        - waiting to lock <0x0000000710249a48> (a mao.t2.Chopstick)
+        - locked <0x0000000710249a38> (a mao.t2.Chopstick)
+"赫拉克利特":
+        at mao.t2.Philosopher.run(Philosopher.java:75)
+        - waiting to lock <0x0000000710249a58> (a mao.t2.Chopstick)
+        - locked <0x0000000710249a48> (a mao.t2.Chopstick)
+"阿基米德":
+        at mao.t2.Philosopher.run(Philosopher.java:75)
+        - waiting to lock <0x0000000710249a18> (a mao.t2.Chopstick)
+        - locked <0x0000000710249a58> (a mao.t2.Chopstick)
+
+Found 1 deadlock.
+
+PS C:\Users\mao\Desktop>
+```
+
+
+
+全部都产生了死锁
+
+
+
+
+
+### 活锁
+
+活锁出现在两个线程互相改变对方的结束条件，最后谁也无法结束
+
+
+
