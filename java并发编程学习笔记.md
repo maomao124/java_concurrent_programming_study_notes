@@ -8233,3 +8233,346 @@ public class Test
 
 ### 死锁
 
+有这样的情况：一个线程需要同时获取多把锁，这时就容易发生死锁
+
+
+
+```java
+package mao.t1;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Project name(项目名称)：java并发编程_活跃性
+ * Package(包名): mao.t1
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/5
+ * Time(创建时间)： 11:22
+ * Version(版本): 1.0
+ * Description(描述)： 死锁
+ */
+
+public class Test
+{
+    /**
+     * lock1
+     */
+    private static final Object lock1 = new Object();
+
+    /**
+     * lock2
+     */
+    private static final Object lock2 = new Object();
+
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+
+    public static void main(String[] args)
+    {
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                synchronized (lock1)
+                {
+                    log.debug("t1获得锁1");
+                    log.debug("t1尝试获取锁2");
+                    synchronized (lock2)
+                    {
+                        log.debug("t1获得锁2");
+                        log.debug("todo...");
+                    }
+                }
+            }
+        }, "t1").start();
+
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                synchronized (lock2)
+                {
+                    log.debug("t2获得锁2");
+                    log.debug("t2尝试获取锁1");
+                    synchronized (lock1)
+                    {
+                        log.debug("t2获得锁1");
+                        log.debug("todo...");
+                    }
+                }
+            }
+        }, "t2").start();
+
+
+        Runtime.getRuntime().addShutdownHook(new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                log.info("程序退出");
+            }
+        },"ShutdownHook"));
+    }
+
+}
+
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-05  11:34:05.530  [t2] DEBUG mao.t1.Test:  t2获得锁2
+2022-09-05  11:34:05.530  [t1] DEBUG mao.t1.Test:  t1获得锁1
+2022-09-05  11:34:05.532  [t2] DEBUG mao.t1.Test:  t2尝试获取锁1
+2022-09-05  11:34:05.533  [t1] DEBUG mao.t1.Test:  t1尝试获取锁2
+2022-09-05  11:34:17.715  [ShutdownHook] INFO  mao.t1.Test:  程序退出
+```
+
+
+
+已经产生死锁
+
+
+
+
+
+### 定位死锁
+
+检测死锁可以使用 jconsole工具，或者使用 jps 定位进程 id，再用 jstack 定位死锁
+
+
+
+**jps+jstack**
+
+
+
+```sh
+PS C:\Users\mao\Desktop> jps
+10712 Test
+17512 Launcher
+11644 RemoteMavenServer36
+12812 RemoteMavenServer36
+2844
+2892 Jps
+PS C:\Users\mao\Desktop>
+```
+
+
+
+```sh
+PS C:\Users\mao\Desktop> jstack 10712
+2022-09-05 11:35:59
+Full thread dump OpenJDK 64-Bit Server VM (16.0.2+7-67 mixed mode, sharing):
+
+Threads class SMR info:
+_java_thread_list=0x00000207e648f3d0, length=15, elements={
+0x00000207e5115710, 0x00000207e51165d0, 0x00000207e512c7c0, 0x00000207e512f5f0,
+0x00000207e512fff0, 0x00000207e51309f0, 0x00000207e5136c30, 0x00000207e5149070,
+0x00000207e5c08070, 0x00000207e5cede20, 0x00000207e5e48520, 0x00000207e5e4d110,
+0x00000207e664bf80, 0x00000207e664c920, 0x00000207c19cf9d0
+}
+
+"Reference Handler" #2 daemon prio=10 os_prio=2 cpu=0.00ms elapsed=91.73s tid=0x00000207e5115710 nid=0x458 waiting on condition  [0x00000071f3bfe000]
+   java.lang.Thread.State: RUNNABLE
+        at java.lang.ref.Reference.waitForReferencePendingList(java.base@16.0.2/Native Method)
+        at java.lang.ref.Reference.processPendingReferences(java.base@16.0.2/Reference.java:243)
+        at java.lang.ref.Reference$ReferenceHandler.run(java.base@16.0.2/Reference.java:215)
+
+"Finalizer" #3 daemon prio=8 os_prio=1 cpu=0.00ms elapsed=91.73s tid=0x00000207e51165d0 nid=0x2e70 in Object.wait()  [0x00000071f3cfe000]
+   java.lang.Thread.State: WAITING (on object monitor)
+        at java.lang.Object.wait(java.base@16.0.2/Native Method)
+        - waiting on <0x000000070f602c18> (a java.lang.ref.ReferenceQueue$Lock)
+        at java.lang.ref.ReferenceQueue.remove(java.base@16.0.2/ReferenceQueue.java:155)
+        - locked <0x000000070f602c18> (a java.lang.ref.ReferenceQueue$Lock)
+        at java.lang.ref.ReferenceQueue.remove(java.base@16.0.2/ReferenceQueue.java:176)
+        at java.lang.ref.Finalizer$FinalizerThread.run(java.base@16.0.2/Finalizer.java:171)
+
+"Signal Dispatcher" #4 daemon prio=9 os_prio=2 cpu=0.00ms elapsed=91.72s tid=0x00000207e512c7c0 nid=0xbd8 runnable  [0x0000000000000000]
+   java.lang.Thread.State: RUNNABLE
+
+"Attach Listener" #5 daemon prio=5 os_prio=2 cpu=15.62ms elapsed=91.72s tid=0x00000207e512f5f0 nid=0x37a0 waiting on condition  [0x0000000000000000]
+   java.lang.Thread.State: RUNNABLE
+
+"Service Thread" #6 daemon prio=9 os_prio=0 cpu=0.00ms elapsed=91.72s tid=0x00000207e512fff0 nid=0x98c runnable  [0x0000000000000000]
+   java.lang.Thread.State: RUNNABLE
+
+"Monitor Deflation Thread" #7 daemon prio=9 os_prio=0 cpu=0.00ms elapsed=91.72s tid=0x00000207e51309f0 nid=0x930 runnable  [0x0000000000000000]
+   java.lang.Thread.State: RUNNABLE
+
+"C2 CompilerThread0" #8 daemon prio=9 os_prio=2 cpu=187.50ms elapsed=91.72s tid=0x00000207e5136c30 nid=0x2344 waiting on condition  [0x0000000000000000]
+   java.lang.Thread.State: RUNNABLE
+   No compile task
+
+"C1 CompilerThread0" #16 daemon prio=9 os_prio=2 cpu=78.12ms elapsed=91.72s tid=0x00000207e5149070 nid=0x4058 waiting on condition  [0x0000000000000000]
+   java.lang.Thread.State: RUNNABLE
+   No compile task
+
+"Sweeper thread" #20 daemon prio=9 os_prio=2 cpu=0.00ms elapsed=91.72s tid=0x00000207e5c08070 nid=0x2bd4 runnable  [0x0000000000000000]
+   java.lang.Thread.State: RUNNABLE
+
+"Common-Cleaner" #21 daemon prio=8 os_prio=1 cpu=0.00ms elapsed=91.70s tid=0x00000207e5cede20 nid=0x7c0 in Object.wait()  [0x00000071f44fe000]
+   java.lang.Thread.State: TIMED_WAITING (on object monitor)
+        at java.lang.Object.wait(java.base@16.0.2/Native Method)
+        - waiting on <0x000000070f6041c0> (a java.lang.ref.ReferenceQueue$Lock)
+        at java.lang.ref.ReferenceQueue.remove(java.base@16.0.2/ReferenceQueue.java:155)
+        - locked <0x000000070f6041c0> (a java.lang.ref.ReferenceQueue$Lock)
+        at jdk.internal.ref.CleanerImpl.run(java.base@16.0.2/CleanerImpl.java:140)
+        at java.lang.Thread.run(java.base@16.0.2/Thread.java:831)
+        at jdk.internal.misc.InnocuousThread.run(java.base@16.0.2/InnocuousThread.java:134)
+
+"Monitor Ctrl-Break" #22 daemon prio=5 os_prio=0 cpu=15.62ms elapsed=91.66s tid=0x00000207e5e48520 nid=0x213c runnable  [0x00000071f46fe000]
+   java.lang.Thread.State: RUNNABLE
+        at sun.nio.ch.SocketDispatcher.read0(java.base@16.0.2/Native Method)
+        at sun.nio.ch.SocketDispatcher.read(java.base@16.0.2/SocketDispatcher.java:46)
+        at sun.nio.ch.NioSocketImpl.tryRead(java.base@16.0.2/NioSocketImpl.java:261)
+        at sun.nio.ch.NioSocketImpl.implRead(java.base@16.0.2/NioSocketImpl.java:312)
+        at sun.nio.ch.NioSocketImpl.read(java.base@16.0.2/NioSocketImpl.java:350)
+        at sun.nio.ch.NioSocketImpl$1.read(java.base@16.0.2/NioSocketImpl.java:803)
+        at java.net.Socket$SocketInputStream.read(java.base@16.0.2/Socket.java:976)
+        at sun.nio.cs.StreamDecoder.readBytes(java.base@16.0.2/StreamDecoder.java:297)
+        at sun.nio.cs.StreamDecoder.implRead(java.base@16.0.2/StreamDecoder.java:339)
+        at sun.nio.cs.StreamDecoder.read(java.base@16.0.2/StreamDecoder.java:188)
+        - locked <0x000000070f601ec8> (a java.io.InputStreamReader)
+        at java.io.InputStreamReader.read(java.base@16.0.2/InputStreamReader.java:178)
+        at java.io.BufferedReader.fill(java.base@16.0.2/BufferedReader.java:161)
+        at java.io.BufferedReader.readLine(java.base@16.0.2/BufferedReader.java:329)
+        - locked <0x000000070f601ec8> (a java.io.InputStreamReader)
+        at java.io.BufferedReader.readLine(java.base@16.0.2/BufferedReader.java:396)
+        at com.intellij.rt.execution.application.AppMainV2$1.run(AppMainV2.java:49)
+
+"Notification Thread" #23 daemon prio=9 os_prio=0 cpu=0.00ms elapsed=91.66s tid=0x00000207e5e4d110 nid=0x3348 runnable  [0x0000000000000000]
+   java.lang.Thread.State: RUNNABLE
+
+"t1" #27 prio=5 os_prio=0 cpu=0.00ms elapsed=91.17s tid=0x00000207e664bf80 nid=0x2a54 waiting for monitor entry  [0x00000071f51ff000]
+   java.lang.Thread.State: BLOCKED (on object monitor)
+        at mao.t1.Test$1.run(Test.java:50)
+        - waiting to lock <0x000000070f711788> (a java.lang.Object)
+        - locked <0x000000070f711798> (a java.lang.Object)
+        at java.lang.Thread.run(java.base@16.0.2/Thread.java:831)
+
+"t2" #28 prio=5 os_prio=0 cpu=0.00ms elapsed=91.17s tid=0x00000207e664c920 nid=0xad4 waiting for monitor entry  [0x00000071f52fe000]
+   java.lang.Thread.State: BLOCKED (on object monitor)
+        at mao.t1.Test$2.run(Test.java:68)
+        - waiting to lock <0x000000070f711798> (a java.lang.Object)
+        - locked <0x000000070f711788> (a java.lang.Object)
+        at java.lang.Thread.run(java.base@16.0.2/Thread.java:831)
+
+"DestroyJavaVM" #30 prio=5 os_prio=0 cpu=546.88ms elapsed=91.17s tid=0x00000207c19cf9d0 nid=0x2084 waiting on condition  [0x0000000000000000]
+   java.lang.Thread.State: RUNNABLE
+
+"VM Thread" os_prio=2 cpu=0.00ms elapsed=91.74s tid=0x00000207e51106c0 nid=0x2924 runnable
+
+"GC Thread#0" os_prio=2 cpu=15.62ms elapsed=91.74s tid=0x00000207c1a228a0 nid=0x37ec runnable
+
+"GC Thread#1" os_prio=2 cpu=15.62ms elapsed=91.43s tid=0x00000207e6416f10 nid=0xde8 runnable
+
+"GC Thread#2" os_prio=2 cpu=15.62ms elapsed=91.43s tid=0x00000207e60f2000 nid=0x226c runnable
+
+"GC Thread#3" os_prio=2 cpu=15.62ms elapsed=91.43s tid=0x00000207e60f2310 nid=0x3ebc runnable
+
+"GC Thread#4" os_prio=2 cpu=15.62ms elapsed=91.43s tid=0x00000207e60f2620 nid=0x19c8 runnable
+
+"GC Thread#5" os_prio=2 cpu=15.62ms elapsed=91.43s tid=0x00000207e60f31c0 nid=0x2808 runnable
+
+"G1 Main Marker" os_prio=2 cpu=0.00ms elapsed=91.74s tid=0x00000207c1a337f0 nid=0x3994 runnable
+
+"G1 Conc#0" os_prio=2 cpu=0.00ms elapsed=91.74s tid=0x00000207c1a34a00 nid=0x2f44 runnable
+
+"G1 Refine#0" os_prio=2 cpu=0.00ms elapsed=91.74s tid=0x00000207e4fd44e0 nid=0x2a94 runnable
+
+"G1 Service" os_prio=2 cpu=0.00ms elapsed=91.74s tid=0x00000207c1a9f080 nid=0x3e30 runnable
+
+"VM Periodic Task Thread" os_prio=2 cpu=0.00ms elapsed=91.66s tid=0x00000207e5e4e2c0 nid=0x1268 waiting on condition
+
+JNI global refs: 23, weak refs: 0
+
+
+Found one Java-level deadlock:
+=============================
+"t1":
+  waiting to lock monitor 0x00000207e66a1340 (object 0x000000070f711788, a java.lang.Object),
+  which is held by "t2"
+
+"t2":
+  waiting to lock monitor 0x00000207e66a2bc0 (object 0x000000070f711798, a java.lang.Object),
+  which is held by "t1"
+
+Java stack information for the threads listed above:
+===================================================
+"t1":
+        at mao.t1.Test$1.run(Test.java:50)
+        - waiting to lock <0x000000070f711788> (a java.lang.Object)
+        - locked <0x000000070f711798> (a java.lang.Object)
+        at java.lang.Thread.run(java.base@16.0.2/Thread.java:831)
+"t2":
+        at mao.t1.Test$2.run(Test.java:68)
+        - waiting to lock <0x000000070f711798> (a java.lang.Object)
+        - locked <0x000000070f711788> (a java.lang.Object)
+        at java.lang.Thread.run(java.base@16.0.2/Thread.java:831)
+
+Found 1 deadlock.
+
+PS C:\Users\mao\Desktop>
+```
+
+
+
+
+
+**jconsole**
+
+
+
+![image-20220905113904130](img/java并发编程学习笔记/image-20220905113904130.png)
+
+
+
+![image-20220905113922440](img/java并发编程学习笔记/image-20220905113922440.png)
+
+
+
+点击线程选项卡
+
+
+
+![image-20220905113949824](img/java并发编程学习笔记/image-20220905113949824.png)
+
+
+
+点击检测死锁
+
+
+
+![image-20220905114026348](img/java并发编程学习笔记/image-20220905114026348.png)
+
+
+
+![image-20220905114032967](img/java并发编程学习笔记/image-20220905114032967.png)
+
+
+
+
+
+
+
+### 哲学家就餐问题
+
+有五位哲学家，围坐在圆桌旁
+
+* 他们只做两件事，思考和吃饭，思考一会吃口饭，吃完饭后接着思考
+* 吃饭时要用两根筷子吃，桌上共有 5 根筷子，每位哲学家左右手边各有一根筷子
+* 如果筷子被身边的人拿着，自己就得等待
+
+
+
