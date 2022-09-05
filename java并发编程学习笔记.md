@@ -9016,3 +9016,208 @@ PS C:\Users\mao\Desktop>
 
 
 
+```java
+package mao.t3;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Project name(项目名称)：java并发编程_活跃性
+ * Package(包名): mao.t3
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/5
+ * Time(创建时间)： 12:00
+ * Version(版本): 1.0
+ * Description(描述)： 活锁
+ */
+
+public class Test
+{
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    /**
+     * volatile保证可见性，保证获取的是最新的数据，但不能保证原子性
+     */
+    static volatile int count = 100;
+
+    public static void main(String[] args)
+    {
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                while (count > 0)
+                {
+                    try
+                    {
+                        Thread.sleep(30);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                    count--;
+                    log.debug("t1 count:" + count);
+                }
+            }
+        }, "t1").start();
+
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                while (count < 200)
+                {
+                    try
+                    {
+                        Thread.sleep(30);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                    count++;
+                    log.debug("t2 count:" + count);
+                }
+            }
+        }, "t2").start();
+    }
+}
+
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-05  12:35:08.357  [t2] DEBUG mao.t3.Test:  t2 count:100
+2022-09-05  12:35:08.357  [t1] DEBUG mao.t3.Test:  t1 count:100
+2022-09-05  12:35:08.401  [t1] DEBUG mao.t3.Test:  t1 count:99
+2022-09-05  12:35:08.401  [t2] DEBUG mao.t3.Test:  t2 count:100
+2022-09-05  12:35:08.432  [t1] DEBUG mao.t3.Test:  t1 count:99
+2022-09-05  12:35:08.432  [t2] DEBUG mao.t3.Test:  t2 count:101
+2022-09-05  12:35:08.463  [t2] DEBUG mao.t3.Test:  t2 count:102
+2022-09-05  12:35:08.463  [t1] DEBUG mao.t3.Test:  t1 count:101
+2022-09-05  12:35:08.495  [t1] DEBUG mao.t3.Test:  t1 count:101
+2022-09-05  12:35:08.495  [t2] DEBUG mao.t3.Test:  t2 count:102
+2022-09-05  12:35:08.527  [t2] DEBUG mao.t3.Test:  t2 count:101
+2022-09-05  12:35:08.527  [t1] DEBUG mao.t3.Test:  t1 count:100
+2022-09-05  12:35:08.558  [t2] DEBUG mao.t3.Test:  t2 count:102
+2022-09-05  12:35:08.558  [t1] DEBUG mao.t3.Test:  t1 count:102
+2022-09-05  12:35:08.589  [t1] DEBUG mao.t3.Test:  t1 count:101
+2022-09-05  12:35:08.589  [t2] DEBUG mao.t3.Test:  t2 count:102
+2022-09-05  12:35:08.621  [t1] DEBUG mao.t3.Test:  t1 count:101
+2022-09-05  12:35:08.621  [t2] DEBUG mao.t3.Test:  t2 count:101
+2022-09-05  12:35:08.653  [t1] DEBUG mao.t3.Test:  t1 count:101
+2022-09-05  12:35:08.653  [t2] DEBUG mao.t3.Test:  t2 count:102
+2022-09-05  12:35:08.698  [t1] DEBUG mao.t3.Test:  t1 count:102
+2022-09-05  12:35:08.698  [t2] DEBUG mao.t3.Test:  t2 count:102
+2022-09-05  12:35:08.729  [t1] DEBUG mao.t3.Test:  t1 count:102
+2022-09-05  12:35:08.729  [t2] DEBUG mao.t3.Test:  t2 count:102
+2022-09-05  12:35:08.761  [t2] DEBUG mao.t3.Test:  t2 count:102
+2022-09-05  12:35:08.761  [t1] DEBUG mao.t3.Test:  t1 count:102
+2022-09-05  12:35:08.793  [t2] DEBUG mao.t3.Test:  t2 count:101
+2022-09-05  12:35:08.793  [t1] DEBUG mao.t3.Test:  t1 count:101
+2022-09-05  12:35:08.825  [t2] DEBUG mao.t3.Test:  t2 count:101
+2022-09-05  12:35:08.825  [t1] DEBUG mao.t3.Test:  t1 count:100
+2022-09-05  12:35:08.856  [t2] DEBUG mao.t3.Test:  t2 count:102
+2022-09-05  12:35:08.857  [t1] DEBUG mao.t3.Test:  t1 count:101
+2022-09-05  12:35:08.889  [t2] DEBUG mao.t3.Test:  t2 count:101
+2022-09-05  12:35:08.889  [t1] DEBUG mao.t3.Test:  t1 count:100
+2022-09-05  12:35:08.921  [t2] DEBUG mao.t3.Test:  t2 count:102
+2022-09-05  12:35:08.921  [t1] DEBUG mao.t3.Test:  t1 count:100
+2022-09-05  12:35:08.952  [t2] DEBUG mao.t3.Test:  t2 count:102
+2022-09-05  12:35:08.952  [t1] DEBUG mao.t3.Test:  t1 count:101
+2022-09-05  12:35:08.983  [t2] DEBUG mao.t3.Test:  t2 count:102
+2022-09-05  12:35:08.983  [t1] DEBUG mao.t3.Test:  t1 count:101
+2022-09-05  12:35:09.014  [t1] DEBUG mao.t3.Test:  t1 count:101
+2022-09-05  12:35:09.014  [t2] DEBUG mao.t3.Test:  t2 count:102
+2022-09-05  12:35:09.046  [t2] DEBUG mao.t3.Test:  t2 count:103
+2022-09-05  12:35:09.046  [t1] DEBUG mao.t3.Test:  t1 count:102
+2022-09-05  12:35:09.078  [t1] DEBUG mao.t3.Test:  t1 count:101
+2022-09-05  12:35:09.078  [t2] DEBUG mao.t3.Test:  t2 count:101
+2022-09-05  12:35:09.109  [t2] DEBUG mao.t3.Test:  t2 count:101
+2022-09-05  12:35:09.109  [t1] DEBUG mao.t3.Test:  t1 count:100
+2022-09-05  12:35:09.140  [t2] DEBUG mao.t3.Test:  t2 count:101
+...
+```
+
+
+
+
+
+### 饥饿
+
+一个线程由于优先级太低，始终得不到 CPU 调度执行，也不能够结束
+
+
+
+![image-20220905124020764](img/java并发编程学习笔记/image-20220905124020764.png)
+
+
+
+顺序加锁
+
+
+
+![image-20220905124057947](img/java并发编程学习笔记/image-20220905124057947.png)
+
+
+
+
+
+
+
+
+
+## ReentrantLock
+
+相对于 synchronized 它具备如下特点
+
+* 可中断
+* 可以设置超时时间
+* 可以设置为公平锁
+* 支持多个条件变量
+
+
+
+与 synchronized 一样，都支持可重入
+
+
+
+
+
+### 语法
+
+```java
+		//获取锁
+        log.debug("尝试获取锁");
+        reentrantLock.lock();
+        try
+        {
+            log.debug("获得到锁");
+            //临界区
+        }
+        finally
+        {
+            //释放锁
+            reentrantLock.unlock();
+            log.debug("释放锁");
+        }
+```
+
+
+
+
+
+
+
+### 可重入
+
