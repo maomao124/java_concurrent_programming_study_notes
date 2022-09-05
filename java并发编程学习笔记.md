@@ -8005,3 +8005,231 @@ t 线程用 synchronized(obj) 获取了对象锁后
 
 ## 多把锁
 
+一间大屋子有两个功能：睡觉、学习，互不相干
+
+现在小南要学习，小女要睡觉，但如果只用一间屋子（一个对象锁）的话，那么并发度很低 解决方法是准备多个房间（多个对象锁）
+
+
+
+```java
+package mao.t1;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Project name(项目名称)：java并发编程_多把锁
+ * Package(包名): mao.t1
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/5
+ * Time(创建时间)： 10:58
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 锁
+     */
+    private static final Object lock = new Object();
+
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+
+    public static void main(String[] args)
+    {
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                synchronized (lock)
+                {
+                    log.debug("线程t1获取到锁");
+                    log.debug("t1休眠3秒");
+                    try
+                    {
+                        Thread.sleep(3000);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                    log.debug("t1运行");
+                    log.debug("t1释放锁");
+                }
+            }
+        }, "t1").start();
+
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                synchronized (lock)
+                {
+                    log.debug("线程t2获取到锁");
+                    log.debug("t2休眠2秒");
+                    try
+                    {
+                        Thread.sleep(2000);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                    log.debug("t2运行");
+                    log.debug("t2释放锁");
+                }
+            }
+        }, "t2").start();
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-05  11:05:20.793  [t1] DEBUG mao.t1.Test:  线程t1获取到锁
+2022-09-05  11:05:20.795  [t1] DEBUG mao.t1.Test:  t1休眠3秒
+2022-09-05  11:05:23.796  [t1] DEBUG mao.t1.Test:  t1运行
+2022-09-05  11:05:23.796  [t1] DEBUG mao.t1.Test:  t1释放锁
+2022-09-05  11:05:23.796  [t2] DEBUG mao.t1.Test:  线程t2获取到锁
+2022-09-05  11:05:23.796  [t2] DEBUG mao.t1.Test:  t2休眠2秒
+2022-09-05  11:05:25.809  [t2] DEBUG mao.t1.Test:  t2运行
+2022-09-05  11:05:25.809  [t2] DEBUG mao.t1.Test:  t2释放锁
+```
+
+
+
+
+
+改进：
+
+```java
+package mao.t2;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Project name(项目名称)：java并发编程_多把锁
+ * Package(包名): mao.t2
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/5
+ * Time(创建时间)： 11:06
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+
+    /**
+     * lock1
+     */
+    private static final Object lock1 = new Object();
+
+    /**
+     * lock2
+     */
+    private static final Object lock2 = new Object();
+
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+
+    public static void main(String[] args)
+    {
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                synchronized (lock1)
+                {
+                    log.debug("线程t1获取到锁1");
+                    log.debug("t1休眠3秒");
+                    try
+                    {
+                        Thread.sleep(3000);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                    log.debug("t1运行");
+                    log.debug("t1释放锁1");
+                }
+            }
+        }, "t1").start();
+
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                synchronized (lock2)
+                {
+                    log.debug("线程t2获取到锁2");
+                    log.debug("t2休眠2秒");
+                    try
+                    {
+                        Thread.sleep(2000);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                    log.debug("t2运行");
+                    log.debug("t2释放锁2");
+                }
+            }
+        }, "t2").start();
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-05  11:07:45.315  [t1] DEBUG mao.t2.Test:  线程t1获取到锁1
+2022-09-05  11:07:45.315  [t2] DEBUG mao.t2.Test:  线程t2获取到锁2
+2022-09-05  11:07:45.318  [t1] DEBUG mao.t2.Test:  t1休眠3秒
+2022-09-05  11:07:45.318  [t2] DEBUG mao.t2.Test:  t2休眠2秒
+2022-09-05  11:07:47.320  [t2] DEBUG mao.t2.Test:  t2运行
+2022-09-05  11:07:47.320  [t2] DEBUG mao.t2.Test:  t2释放锁2
+2022-09-05  11:07:48.333  [t1] DEBUG mao.t2.Test:  t1运行
+2022-09-05  11:07:48.333  [t1] DEBUG mao.t2.Test:  t1释放锁1
+```
+
+
+
+将锁的粒度细分
+
+* 好处，是可以增强并发度
+* 坏处，如果一个线程需要同时获得多把锁，就容易发生死锁
+
+
+
+
+
+
+
+## 活跃性
+
+### 死锁
+
