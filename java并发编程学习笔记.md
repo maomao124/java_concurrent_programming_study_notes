@@ -11424,3 +11424,529 @@ abcabcabcabcabc
 
 # 共享模型之内存
 
+## Java 内存模型
+
+JMM 即 Java Memory Model，它定义了主存、工作内存抽象概念，底层对应着 CPU 寄存器、缓存、硬件内存、 CPU 指令优化等
+
+JMM 体现在以下几个方面：
+
+* 原子性 - 保证指令不会受到线程上下文切换的影响
+* 可见性 - 保证指令不会受 cpu 缓存的影响
+* 有序性 - 保证指令不会受 cpu 指令并行优化的影响
+
+
+
+
+
+## 可见性
+
+### **退不出的循环**
+
+main 线程对 run 变量的修改对于 t1 线程不可见，导致了 t1 线程无法停止
+
+
+
+```java
+package mao.t1;
+
+import java.util.Date;
+
+/**
+ * Project name(项目名称)：java并发编程_Java内存模型_可见性
+ * Package(包名): mao.t1
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/6
+ * Time(创建时间)： 12:43
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    private static boolean run = true;
+
+    public static void main(String[] args) throws InterruptedException
+    {
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                while (run)
+                {
+                    //运行
+                }
+                System.out.println("运行结束");
+            }
+        }, "t1").start();
+
+        Thread thread = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                while (true)
+                {
+                    System.out.println("------>" + new Date());
+                    try
+                    {
+                        Thread.sleep(1000);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }, "t2");
+        thread.setDaemon(true);
+        thread.start();
+
+        Thread.sleep(1500);
+        System.out.println("开始停止");
+        run = false; //并不会停止运行
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+------>Tue Sep 06 12:49:01 CST 2022
+------>Tue Sep 06 12:49:02 CST 2022
+开始停止
+------>Tue Sep 06 12:49:03 CST 2022
+------>Tue Sep 06 12:49:04 CST 2022
+------>Tue Sep 06 12:49:05 CST 2022
+------>Tue Sep 06 12:49:06 CST 2022
+------>Tue Sep 06 12:49:07 CST 2022
+------>Tue Sep 06 12:49:08 CST 2022
+------>Tue Sep 06 12:49:09 CST 2022
+...
+```
+
+
+
+
+
+**分析：**
+
+
+
+* 初始状态， t1 线程刚开始从主内存读取了 run 的值到工作内存
+
+
+
+![image-20220906125127149](img/java并发编程学习笔记/image-20220906125127149.png)
+
+
+
+
+
+*  因为 t1 线程要频繁从主内存中读取 run 的值，JIT 编译器会将 run 的值缓存至自己工作内存中的高速缓存中， 减少对主存中 run 的访问，提高效率
+
+
+
+![image-20220906125358425](img/java并发编程学习笔记/image-20220906125358425.png)
+
+
+
+
+
+* 1.5秒之后，main 线程修改了 run 的值，并同步至主存，而 t1 是从自己工作内存中的高速缓存中读取这个变量的值，结果永远是旧值
+
+
+
+![image-20220906125253893](img/java并发编程学习笔记/image-20220906125253893.png)
+
+
+
+
+
+
+
+### 解决
+
+**在字段添加volatile关键字**
+
+它可以用来修饰成员变量和静态成员变量，他可以避免线程从自己的工作缓存中查找变量的值，必须到主存中获取它的值，线程操作 volatile 变量都是直接操作主存
+
+
+
+
+
+```java
+package mao.t2;
+
+import java.util.Date;
+
+/**
+ * Project name(项目名称)：java并发编程_Java内存模型_可见性
+ * Package(包名): mao.t2
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/6
+ * Time(创建时间)： 12:55
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    private static volatile boolean run = true;
+
+    public static void main(String[] args) throws InterruptedException
+    {
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                while (run)
+                {
+                    //运行
+                }
+                System.out.println("运行结束");
+            }
+        }, "t1").start();
+
+        Thread thread = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                while (true)
+                {
+                    System.out.println("------>" + new Date());
+                    try
+                    {
+                        Thread.sleep(1000);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }, "t2");
+        thread.setDaemon(true);
+        thread.start();
+
+        Thread.sleep(1500);
+        System.out.println("开始停止");
+        run = false;
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+------>Tue Sep 06 12:56:34 CST 2022
+------>Tue Sep 06 12:56:35 CST 2022
+开始停止
+运行结束
+```
+
+
+
+
+
+### 可见性 vs 原子性
+
+可见性，它保证的是在多个线程之间，一个线程对 volatile 变量的修改对另一个线程可见， 不能保证原子性，仅用在一个写线程，多个读线程的情况
+
+比如两个线程一个 **i++**操作 ，一个 **i--**操作，只能保证看到最新值，不能解决指令交错
+
+
+
+synchronized 语句块既可以保证代码块的原子性，也同时保证代码块内变量的可见性。但缺点是 synchronized 是属于重量级操作，性能相对更低
+
+
+
+
+
+### 案例
+
+单例模式
+
+使用双重检查锁
+
+对于 `getInstance()` 方法来说，绝大部分的操作都是读操作，读操作是线程安全的，所以我们没必让每个线程必须持有锁才能调用该方法，我们需要调整加锁的时机。由此也产生了一种新的实现模式：双重检查锁模式
+
+
+
+
+
+```java
+package mao.m5;
+
+/**
+ * Project name(项目名称)：java设计模式_单例模式
+ * Package(包名): mao.m5
+ * Class(类名): Singleton
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/8/11
+ * Time(创建时间)： 22:28
+ * Version(版本): 1.0
+ * Description(描述)： 懒汉式-方式3（双重检查锁）
+ */
+
+public class Singleton
+{
+    public String str = "hello world";
+
+    public String show()
+    {
+        return "show";
+    }
+
+    /**
+     * 私有化构造方法
+     */
+    private Singleton()
+    {
+        System.out.println("实例私有化构造方法");
+    }
+
+    private static Singleton instance;
+
+    /**
+     * 对外提供方法获取该对象
+     * 线程安全
+     *
+     * @return Singleton对象
+     */
+    public static Singleton getInstance()
+    {
+        //第一次判断，如果instance不为null，不进入抢锁阶段，直接返回实例
+        if (instance == null)
+        {
+            synchronized (Singleton.class)
+            {
+                //抢到锁之后再次判断是否为null
+                if (instance == null)
+                {
+                    System.out.println("创建对象实例");
+                    instance = new Singleton();
+                }
+            }
+        }
+        return instance;
+    }
+}
+```
+
+
+
+```java
+package mao.m5;
+
+
+
+/**
+ * Project name(项目名称)：java设计模式_单例模式
+ * Package(包名): mao.m5
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/8/11
+ * Time(创建时间)： 22:34
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    public static void main(String[] args) throws ClassNotFoundException, InterruptedException
+    {
+        Class.forName("mao.m5.Singleton");
+        Thread.sleep(1000);
+        System.out.println(Singleton.getInstance().str);
+        System.out.println(Singleton.getInstance().show());
+        //打印的内存地址都一样，单例
+        System.out.println(Singleton.getInstance());
+        System.out.println(Singleton.getInstance());
+        System.out.println(Singleton.getInstance());
+    }
+}
+```
+
+
+
+
+
+```java
+package mao.m5;
+
+
+/**
+ * Project name(项目名称)：java设计模式_单例模式
+ * Package(包名): mao.m5
+ * Class(类名): Test2
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/8/11
+ * Time(创建时间)： 22:35
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test2
+{
+    public static void main(String[] args)
+    {
+        Thread[] threads = new Thread[100];
+        for (int i = 0; i < 100; i++)
+        {
+            //可简写为：new Thread(Singleton::getInstance);
+            threads[i] = new Thread(new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    System.out.println(Singleton.getInstance());
+                }
+            });
+        }
+        for (int i = 0; i < 100; i++)
+        {
+            threads[i].start();
+        }
+    }
+}
+```
+
+
+
+双重检查锁模式是一种非常好的单例实现模式，解决了单例、性能、线程安全问题，上面的双重检测锁模式看上去完美无缺，其实是存在问题，在多线程的情况下，可能会出现空指针问题，出现问题的原因是JVM在实例化对象的时候会进行优化和指令重排序操作。
+
+要解决双重检查锁模式带来空指针异常的问题，只需要使用 `volatile` 关键字, `volatile` 关键字可以保证可见性和有序性。
+
+
+
+
+
+```java
+package mao.m5;
+
+/**
+ * Project name(项目名称)：java设计模式_单例模式
+ * Package(包名): mao.m5
+ * Class(类名): Singleton
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/8/11
+ * Time(创建时间)： 22:28
+ * Version(版本): 1.0
+ * Description(描述)： 懒汉式-方式3（双重检查锁）
+ * <p>
+ * 在多线程的情况下，可能会出现空指针问题，出现问题的原因是JVM在实例化对象的时候会进行优化和指令重排序操作。
+ * 要解决双重检查锁模式带来空指针异常的问题，只需要使用 `volatile` 关键字, `volatile` 关键字可以保证可见性和有序性。
+ */
+
+public class Singleton
+{
+    public String str = "hello world";
+
+    public String show()
+    {
+        return "show";
+    }
+
+    /**
+     * 私有化构造方法
+     */
+    private Singleton()
+    {
+        System.out.println("实例私有化构造方法");
+    }
+
+    private static volatile Singleton instance;
+
+    /**
+     * 对外提供方法获取该对象
+     * 线程安全
+     *
+     * @return Singleton对象
+     */
+    public static Singleton getInstance()
+    {
+        //第一次判断，如果instance不为null，不进入抢锁阶段，直接返回实例
+        if (instance == null)
+        {
+            synchronized (Singleton.class)
+            {
+                //抢到锁之后再次判断是否为null
+                if (instance == null)
+                {
+                    System.out.println("创建对象实例");
+                    instance = new Singleton();
+                }
+            }
+        }
+        return instance;
+    }
+}
+```
+
+
+
+
+
+
+
+## 有序性
+
+JVM 会在不影响正确性的前提下，可以调整语句的执行顺序
+
+
+
+```
+static int i;
+static int j;
+// 在某个线程内执行如下赋值操作
+i = ...; 
+j = ...; 
+```
+
+
+
+至于是先执行 i 还是 先执行 j ，对最终的结果不会产生影响。所以，上面代码真正执行时，既可以是
+
+```
+i = ...; 
+j = ...;
+```
+
+也可以是
+
+```
+j = ...;
+i = ...;
+```
+
+
+
+
+
+
+
+### 指令级并行
+
+
+
