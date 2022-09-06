@@ -10911,3 +10911,516 @@ park 和 unpark 方法比较灵活，他俩谁先调用，谁后调用无所谓�
 
 ### 交替输出
 
+线程 1 输出 a 5 次，线程 2 输出 b 5 次，线程 3 输出 c 5 次。现在要求输出 abcabcabcabcabc
+
+
+
+#### wait notify
+
+
+
+```java
+package mao.t3;
+
+/**
+ * Project name(项目名称)：java并发编程_顺序控制
+ * Package(包名): mao.t3
+ * Class(类名): WaitNotify
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/6
+ * Time(创建时间)： 11:18
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class WaitNotify
+{
+    /**
+     * 运行标记
+     */
+    private int flag;
+
+    /**
+     * 循环次数
+     */
+    private final int loopNumber;
+
+
+    /**
+     * Instantiates a new Wait notify.
+     *
+     * @param flag       the flag
+     * @param loopNumber the loop number
+     */
+    public WaitNotify(int flag, int loopNumber)
+    {
+        this.flag = flag;
+        this.loopNumber = loopNumber;
+    }
+
+    /**
+     * 打印
+     *
+     * @param waitFlag 等待标记
+     * @param nextFlag 下一个标记
+     * @param str      字符串
+     */
+    public void print(int waitFlag, int nextFlag, String str)
+    {
+        //循环
+        for (int i = 0; i < loopNumber; i++)
+        {
+            synchronized (this)
+            {
+                //不是就等待
+                while (this.flag != waitFlag)
+                {
+                    try
+                    {
+                        this.wait();
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                }
+                //是
+                //输出
+                System.out.print(str);
+                this.flag = nextFlag;
+                this.notifyAll();
+            }
+        }
+    }
+}
+```
+
+
+
+
+
+```java
+package mao.t3;
+
+/**
+ * Project name(项目名称)：java并发编程_顺序控制
+ * Package(包名): mao.t3
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/6
+ * Time(创建时间)： 11:17
+ * Version(版本): 1.0
+ * Description(描述)： 交替输出，wait notify
+ */
+
+public class Test
+{
+    public static void main(String[] args)
+    {
+        WaitNotify waitNotify = new WaitNotify(1, 5);
+
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                waitNotify.print(1, 2, "a");
+            }
+        }, "t1").start();
+
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                waitNotify.print(2, 3, "b");
+
+            }
+        }, "t2").start();
+
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                waitNotify.print(3, 1, "c");
+            }
+        }, "t3").start();
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+abcabcabcabcabc
+```
+
+
+
+
+
+#### Lock 条件变量
+
+
+
+```java
+package mao.t4;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
+
+/**
+ * Project name(项目名称)：java并发编程_顺序控制
+ * Package(包名): mao.t4
+ * Class(类名): AwaitSignal
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/6
+ * Time(创建时间)： 12:10
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class AwaitSignal extends ReentrantLock
+{
+    private static final Logger log = LoggerFactory.getLogger(AwaitSignal.class);
+
+    /**
+     * 循环数
+     */
+    private final int loopNumber;
+
+    /**
+     * 等待信号
+     *
+     * @param loopNumber 循环数
+     */
+    public AwaitSignal(int loopNumber)
+    {
+        this.loopNumber = loopNumber;
+    }
+
+    /**
+     * 开始
+     *
+     * @param first 第一个
+     */
+    public void start(Condition first)
+    {
+        this.lock();
+        try
+        {
+            log.debug("开始");
+            first.signal();
+        }
+        finally
+        {
+            this.unlock();
+        }
+    }
+
+    /**
+     * 打印
+     *
+     * @param str     str
+     * @param current 当前
+     * @param next    下一个
+     */
+    public void print(String str, Condition current, Condition next)
+    {
+        for (int i = 0; i < loopNumber; i++)
+        {
+            this.lock();
+            try
+            {
+                current.await();
+                System.out.print(str);
+                next.signal();
+            }
+            catch (InterruptedException e)
+            {
+                e.printStackTrace();
+            }
+            finally
+            {
+                this.unlock();
+            }
+        }
+    }
+
+}
+```
+
+
+
+```java
+package mao.t4;
+
+import java.util.concurrent.locks.Condition;
+
+/**
+ * Project name(项目名称)：java并发编程_顺序控制
+ * Package(包名): mao.t4
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/6
+ * Time(创建时间)： 12:14
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    public static void main(String[] args)
+    {
+        AwaitSignal awaitSignal = new AwaitSignal(5);
+        Condition condition1 = awaitSignal.newCondition();
+        Condition condition2 = awaitSignal.newCondition();
+        Condition condition3 = awaitSignal.newCondition();
+
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                awaitSignal.print("a", condition1, condition2);
+            }
+        }, "t1").start();
+
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                awaitSignal.print("b", condition2, condition3);
+            }
+        }, "t2").start();
+
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                awaitSignal.print("c", condition3, condition1);
+            }
+        }, "t3").start();
+
+        awaitSignal.start(condition1);
+
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-06  12:17:33.399  [main] DEBUG mao.t4.AwaitSignal:  开始
+abcabcabcabcabc
+```
+
+
+
+
+
+####  Park Unpark
+
+
+
+```java
+package mao.t5;
+
+import java.util.concurrent.locks.LockSupport;
+
+/**
+ * Project name(项目名称)：java并发编程_顺序控制
+ * Package(包名): mao.t5
+ * Class(类名): ParkUnpark
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/6
+ * Time(创建时间)： 12:20
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class ParkUnpark
+{
+    /**
+     * 循环数
+     */
+    private final int loopNumber;
+    /**
+     * 线程数组
+     */
+    private Thread[] threads;
+
+    public ParkUnpark(int loopNumber)
+    {
+        this.loopNumber = loopNumber;
+    }
+
+    /**
+     * 设置线程
+     *
+     * @param threads 线程
+     */
+    public void setThreads(Thread... threads)
+    {
+        this.threads = threads;
+    }
+
+    /**
+     * 打印
+     *
+     * @param str str
+     */
+    public void print(String str)
+    {
+        for (int i = 0; i < loopNumber; i++)
+        {
+            LockSupport.park();
+            System.out.print(str);
+            LockSupport.unpark(nextThread());
+        }
+    }
+
+    /**
+     * 下一个线程
+     *
+     * @return {@link Thread}
+     */
+    private Thread nextThread()
+    {
+        Thread current = Thread.currentThread();
+        int index = 0;
+
+        for (int i = 0; i < threads.length; i++)
+        {
+            if (threads[i] == current)
+            {
+                index = i;
+                break;
+            }
+        }
+        if (index < threads.length - 1)
+        {
+            return threads[index + 1];
+        }
+        else
+        {
+            return threads[0];
+        }
+    }
+
+    /**
+     * 开始
+     */
+    public void start()
+    {
+        for (Thread thread : threads)
+        {
+            thread.start();
+        }
+        LockSupport.unpark(threads[0]);
+    }
+}
+```
+
+
+
+```java
+package mao.t5;
+
+/**
+ * Project name(项目名称)：java并发编程_顺序控制
+ * Package(包名): mao.t5
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/6
+ * Time(创建时间)： 12:20
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    public static void main(String[] args)
+    {
+        ParkUnpark parkUnpark = new ParkUnpark(5);
+
+        Thread thread1 = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                parkUnpark.print("a");
+            }
+        }, "t1");
+
+        Thread thread2 = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                parkUnpark.print("b");
+            }
+        }, "t2");
+
+        Thread thread3 = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                parkUnpark.print("c");
+            }
+        }, "t3");
+
+        parkUnpark.setThreads(thread1, thread2, thread3);
+
+        parkUnpark.start();
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+abcabcabcabcabc
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# 共享模型之内存
+
