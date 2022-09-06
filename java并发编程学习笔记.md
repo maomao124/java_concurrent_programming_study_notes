@@ -12140,3 +12140,418 @@ public void actor1(I_Result r) {
 
 ### 如何保证有序性
 
+* 写屏障会确保指令重排序时，不会将写屏障之前的代码排在写屏障之后
+
+* 读屏障会确保指令重排序时，不会将读屏障之后的代码排在读屏障之前
+
+
+
+* 写屏障仅仅是保证之后的读能够读到最新的结果，但不能保证读跑到它前面去
+
+* 而有序性的保证也只是保证了本线程内相关代码不被重排序
+
+
+
+![image-20220906194154526](img/java并发编程学习笔记/image-20220906194154526.png)
+
+
+
+
+
+
+
+
+
+## happens-before
+
+happens-before 规定了对共享变量的写操作对其它线程的读操作可见，它是可见性与有序性的一套规则总结，抛开以下 happens-before 规则，JMM 并不能保证一个线程对共享变量的写，对于其它线程对该共享变量的读可见
+
+
+
+### 规则一
+
+线程解锁 m 之前对变量的写，对于接下来对 m 加锁的其它线程对该变量的读可见
+
+
+
+```java
+package mao.t1;
+
+/**
+ * Project name(项目名称)：java并发编程_happens_before
+ * Package(包名): mao.t1
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/6
+ * Time(创建时间)： 19:46
+ * Version(版本): 1.0
+ * Description(描述)： 线程解锁 m 之前对变量的写，对于接下来对 m 加锁的其它线程对该变量的读可见
+ */
+
+public class Test
+{
+    private static int x;
+    private static final Object m = new Object();
+
+    public static void main(String[] args)
+    {
+        new Thread(() ->
+        {
+            synchronized (m)
+            {
+                x = 10;
+            }
+        }, "t1").start();
+
+        new Thread(() ->
+        {
+            synchronized (m)
+            {
+                System.out.println(x);
+            }
+        }, "t2").start();
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+10
+```
+
+
+
+
+
+### 规则二
+
+线程对 volatile 变量的写，对接下来其它线程对该变量的读可见
+
+
+
+```java
+package mao.t2;
+
+/**
+ * Project name(项目名称)：java并发编程_happens_before
+ * Package(包名): mao.t2
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/6
+ * Time(创建时间)： 19:49
+ * Version(版本): 1.0
+ * Description(描述)： 线程对 volatile 变量的写，对接下来其它线程对该变量的读可见
+ */
+
+public class Test
+{
+    private volatile static int x;
+
+    public static void main(String[] args)
+    {
+
+        new Thread(() ->
+        {
+            x = 10;
+        }, "t1").start();
+
+
+        new Thread(() ->
+        {
+            System.out.println(x);
+        }, "t2").start();
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+10
+```
+
+
+
+
+
+### 规则三
+
+线程 start 前对变量的写，对该线程开始后对该变量的读可见
+
+
+
+```java
+package mao.t3;
+
+/**
+ * Project name(项目名称)：java并发编程_happens_before
+ * Package(包名): mao.t3
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/6
+ * Time(创建时间)： 19:52
+ * Version(版本): 1.0
+ * Description(描述)： 线程 start 前对变量的写，对该线程开始后对该变量的读可见
+ */
+
+public class Test
+{
+    static int x;
+
+    public static void main(String[] args)
+    {
+        x = 10;
+
+        new Thread(() ->
+        {
+            System.out.println(x);
+        }, "t2").start();
+
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+10
+```
+
+
+
+
+
+### 规则四
+
+线程结束前对变量的写，对其它线程得知它结束后的读可见（比如其它线程调用 t1.isAlive() 或 t1.join()等待它结束）
+
+
+
+```java
+package mao.t4;
+
+/**
+ * Project name(项目名称)：java并发编程_happens_before
+ * Package(包名): mao.t4
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/6
+ * Time(创建时间)： 19:59
+ * Version(版本): 1.0
+ * Description(描述)： 线程结束前对变量的写，对其它线程得知它结束后的读可见（比如其它线程调用 t1.isAlive() 或 t1.join()等待它结束）
+ */
+
+public class Test
+{
+    private static int x;
+
+    public static void main(String[] args) throws InterruptedException
+    {
+        Thread t1 = new Thread(() ->
+        {
+            x = 10;
+
+        }, "t1");
+        t1.start();
+
+        t1.join();
+        System.out.println(x);
+
+    }
+
+}
+```
+
+
+
+运行结果：
+
+```sh
+10
+```
+
+
+
+
+
+### 规则五
+
+线程 t1 打断 t2（interrupt）前对变量的写，对于其他线程得知 t2 被打断后对变量的读可见（通过 t2.interrupted 或 t2.isInterrupted）
+
+
+
+```java
+package mao.t5;
+
+/**
+ * Project name(项目名称)：java并发编程_happens_before
+ * Package(包名): mao.t5
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/6
+ * Time(创建时间)： 20:05
+ * Version(版本): 1.0
+ * Description(描述)： 线程 t1 打断 t2（interrupt）前对变量的写，对于其他线程得知 t2 被打断后对变量的读可见
+ * （通过t2.interrupted 或 t2.isInterrupted）
+ */
+
+public class Test
+{
+    private static int x;
+
+    public static void main(String[] args)
+    {
+        Thread t2 = new Thread(() ->
+        {
+            while (true)
+            {
+                if (Thread.currentThread().isInterrupted())
+                {
+                    System.out.println(x);
+                    break;
+                }
+            }
+        }, "t2");
+
+
+        t2.start();
+
+        new Thread(() ->
+        {
+            try
+            {
+                Thread.sleep(1000);
+            }
+            catch (InterruptedException e)
+            {
+                e.printStackTrace();
+            }
+            x = 10;
+            t2.interrupt();
+        }, "t1").start();
+
+
+        while (!t2.isInterrupted())
+        {
+            Thread.yield();
+        }
+        System.out.println(x);
+    }
+
+}
+```
+
+
+
+运行结果：
+
+```sh
+10
+10
+```
+
+
+
+
+
+### 规则六
+
+对变量默认值（0，false，null）的写，对其它线程对该变量的读可见
+
+
+
+
+
+### 规则七
+
+具有传递性，如果 x hb-> y 并且 y hb-> z 那么有 x hb-> z 
+
+
+
+```java
+package mao.t6;
+
+/**
+ * Project name(项目名称)：java并发编程_happens_before
+ * Package(包名): mao.t6
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/6
+ * Time(创建时间)： 20:10
+ * Version(版本): 1.0
+ * Description(描述)： 具有传递性
+ */
+
+public class Test
+{
+    volatile static int x;
+    static int y;
+
+    public static void main(String[] args)
+    {
+        new Thread(() ->
+        {
+            y = 10;
+            x = 20;
+            //写屏障，写屏障保证在该屏障之前的，对共享变量的改动，都同步到主存当中
+            //y在写屏障之前
+        }, "t1").start();
+
+
+        new Thread(() ->
+        {
+            // x=20 对 t2 可见, 同时 y=10 也对 t2 可见
+            System.out.println(x);
+        }, "t2").start();
+    }
+
+}
+```
+
+
+
+运行结果：
+
+```sh
+20
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# 共享模型之无锁
+
