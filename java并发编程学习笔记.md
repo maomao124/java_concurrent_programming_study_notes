@@ -12555,3 +12555,405 @@ public class Test
 
 # 共享模型之无锁
 
+## 取款问题
+
+
+
+### 线程不安全实现
+
+```java
+package mao;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Project name(项目名称)：java并发编程_取款问题无锁实现
+ * Package(包名): mao
+ * Interface(接口名): Account
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/7
+ * Time(创建时间)： 10:27
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public interface Account
+{
+    /**
+     * 获取余额
+     *
+     * @return {@link Integer}
+     */
+    Integer getBalance();
+
+    /**
+     * 取款
+     *
+     * @param amount amount
+     */
+    void withdraw(Integer amount);
+
+    /**
+     * 方法内会启动 1000 个线程，每个线程做 -10 元 的操作
+     * 如果初始余额为 10000 那么正确的结果应当是 0
+     */
+    static void start(Account account)
+    {
+        List<Thread> threads = new ArrayList<>();
+        long start = System.nanoTime();
+        for (int i = 0; i < 1000; i++)
+        {
+            threads.add(new Thread(() ->
+            {
+                account.withdraw(10);
+            }));
+        }
+        threads.forEach(Thread::start);
+        threads.forEach(t ->
+        {
+            try
+            {
+                t.join();
+            }
+            catch (InterruptedException e)
+            {
+                e.printStackTrace();
+            }
+        });
+        long end = System.nanoTime();
+        System.out.println("剩余金额：" + account.getBalance());
+        System.out.println("花费时间: " + (end - start) / 1000_000 + " ms");
+    }
+}
+```
+
+
+
+```java
+package mao.t1;
+
+import mao.Account;
+
+/**
+ * Project name(项目名称)：java并发编程_取款问题无锁实现
+ * Package(包名): mao.t1
+ * Class(类名): AccountUnsafe
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/7
+ * Time(创建时间)： 10:29
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+public class AccountUnsafe implements Account
+{
+    private Integer balance;
+
+
+    /**
+     * Instantiates a new Account unsafe.
+     *
+     * @param balance the balance
+     */
+    public AccountUnsafe(Integer balance)
+    {
+        this.balance = balance;
+    }
+
+
+    @Override
+    public Integer getBalance()
+    {
+        return balance;
+    }
+
+    @Override
+    public void withdraw(Integer amount)
+    {
+        balance -= amount;
+    }
+}
+```
+
+
+
+```java
+package mao.t1;
+
+import mao.Account;
+
+/**
+ * Project name(项目名称)：java并发编程_取款问题无锁实现
+ * Package(包名): mao.t1
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/7
+ * Time(创建时间)： 10:25
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * @param args 参数
+     */
+    public static void main(String[] args)
+    {
+        Account.start(new AccountUnsafe(10000));
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+剩余金额：150
+花费时间: 113 ms
+```
+
+```sh
+剩余金额：650
+花费时间: 105 ms
+```
+
+```sh
+剩余金额：280
+花费时间: 98 ms
+```
+
+
+
+
+
+线程不安全
+
+
+
+### 加锁方式实现
+
+
+
+```java
+package mao.t2;
+
+import mao.Account;
+
+/**
+ * Project name(项目名称)：java并发编程_取款问题无锁实现
+ * Package(包名): mao.t2
+ * Class(类名): AccountSynchronized
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/7
+ * Time(创建时间)： 10:46
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+
+public class AccountSynchronized implements Account
+{
+    private Integer balance;
+
+    /**
+     * Instantiates a new Account synchronized.
+     *
+     * @param balance the balance
+     */
+    public AccountSynchronized(Integer balance)
+    {
+        this.balance = balance;
+    }
+
+    @Override
+    public synchronized Integer getBalance()
+    {
+        return balance;
+    }
+
+    @Override
+    public synchronized void withdraw(Integer amount)
+    {
+        balance -= amount;
+    }
+}
+```
+
+
+
+```java
+package mao.t2;
+
+import mao.Account;
+
+/**
+ * Project name(项目名称)：java并发编程_取款问题无锁实现
+ * Package(包名): mao.t2
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/7
+ * Time(创建时间)： 10:47
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    public static void main(String[] args)
+    {
+        Account.start(new AccountSynchronized(10000));
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+剩余金额：0
+花费时间: 98 ms
+```
+
+```sh
+剩余金额：0
+花费时间: 95 ms
+```
+
+```sh
+剩余金额：0
+花费时间: 103 ms
+```
+
+
+
+
+
+
+
+### 无锁实现
+
+
+
+```java
+package mao.t3;
+
+import mao.Account;
+
+import java.util.concurrent.atomic.AtomicInteger;
+
+/**
+ * Project name(项目名称)：java并发编程_取款问题无锁实现
+ * Package(包名): mao.t3
+ * Class(类名): AccountSafe
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/7
+ * Time(创建时间)： 10:49
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class AccountSafe implements Account
+{
+    private final AtomicInteger balance;
+
+    public AccountSafe(Integer balance)
+    {
+        this.balance = new AtomicInteger(balance);
+    }
+
+
+    @Override
+    public Integer getBalance()
+    {
+        return balance.get();
+    }
+
+    @Override
+    public void withdraw(Integer amount)
+    {
+        while (true)
+        {
+            int prev = balance.get();
+            int next = prev - amount;
+            if (balance.compareAndSet(prev, next))
+            {
+                break;
+            }
+        }
+        //或者
+        //balance.addAndGet(-1 * amount);
+    }
+}
+```
+
+
+
+```java
+package mao.t3;
+
+import mao.Account;
+
+/**
+ * Project name(项目名称)：java并发编程_取款问题无锁实现
+ * Package(包名): mao.t3
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/7
+ * Time(创建时间)： 10:54
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    public static void main(String[] args)
+    {
+        Account.start(new AccountSafe(10000));
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+剩余金额：0
+花费时间: 93 ms
+```
+
+```sh
+剩余金额：0
+花费时间: 92 ms
+```
+
+```sh
+剩余金额：0
+花费时间: 92 ms
+```
+
+
+
+
+
+
+
+## CAS 与 volatile
+
