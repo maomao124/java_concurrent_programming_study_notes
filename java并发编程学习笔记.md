@@ -13275,3 +13275,311 @@ public class Test
 
 
 
+
+
+### 取款问题
+
+```java
+package mao.t1;
+
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Project name(项目名称)：java并发编程_原子引用
+ * Package(包名): mao.t1
+ * Interface(接口名): DecimalAccount
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/7
+ * Time(创建时间)： 11:50
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public interface DecimalAccount
+{
+    /**
+     * 获取余额
+     *
+     * @return {@link BigDecimal}
+     */
+    BigDecimal getBalance();
+
+    /**
+     * 取款
+     *
+     * @param amount BigDecimal
+     */
+    void withdraw(BigDecimal amount);
+
+    /**
+     * 方法内会启动 1000 个线程，每个线程做 -10 元 的操作
+     * 如果初始余额为 10000 那么正确的结果应当是 0
+     */
+    static void start(DecimalAccount account)
+    {
+        List<Thread> threads = new ArrayList<>();
+        long start = System.currentTimeMillis();
+        for (int i = 0; i < 1000; i++)
+        {
+            threads.add(new Thread(() ->
+            {
+                account.withdraw(BigDecimal.TEN);
+            }));
+        }
+        threads.forEach(Thread::start);
+        threads.forEach(t ->
+        {
+            try
+            {
+                t.join();
+            }
+            catch (InterruptedException e)
+            {
+                e.printStackTrace();
+            }
+        });
+        long end = System.currentTimeMillis();
+        System.out.println("剩余余额：" + account.getBalance());
+        System.out.println("运行时间：" + (end - start) + "ms");
+    }
+}
+```
+
+
+
+#### 不安全实现
+
+```java
+package mao.t1;
+
+import java.math.BigDecimal;
+
+/**
+ * Project name(项目名称)：java并发编程_原子引用
+ * Package(包名): mao.t1
+ * Class(类名): DecimalAccountUnsafe
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/7
+ * Time(创建时间)： 11:51
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class DecimalAccountUnsafe implements DecimalAccount
+{
+
+    private BigDecimal balance;
+
+    public DecimalAccountUnsafe(BigDecimal balance)
+    {
+        this.balance = balance;
+    }
+
+    @Override
+    public BigDecimal getBalance()
+    {
+        return balance;
+    }
+
+    @Override
+    public void withdraw(BigDecimal amount)
+    {
+        BigDecimal balance = this.getBalance();
+        this.balance = balance.subtract(amount);
+    }
+}
+```
+
+
+
+
+
+#### 使用锁
+
+```java
+package mao.t1;
+
+import java.math.BigDecimal;
+
+/**
+ * Project name(项目名称)：java并发编程_原子引用
+ * Package(包名): mao.t1
+ * Class(类名): DecimalAccountSafeLock
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/7
+ * Time(创建时间)： 11:53
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class DecimalAccountSafeLock implements DecimalAccount
+{
+    /**
+     * 锁
+     */
+    private final Object lock = new Object();
+    private BigDecimal balance;
+
+    public DecimalAccountSafeLock(BigDecimal balance)
+    {
+        this.balance = balance;
+    }
+
+    @Override
+    public BigDecimal getBalance()
+    {
+        return balance;
+    }
+
+    @Override
+    public void withdraw(BigDecimal amount)
+    {
+        synchronized (lock)
+        {
+            BigDecimal balance = this.getBalance();
+            this.balance = balance.subtract(amount);
+        }
+    }
+
+}
+```
+
+
+
+#### 使用 CAS
+
+
+
+```java
+package mao.t1;
+
+import java.math.BigDecimal;
+import java.util.concurrent.atomic.AtomicReference;
+
+/**
+ * Project name(项目名称)：java并发编程_原子引用
+ * Package(包名): mao.t1
+ * Class(类名): DecimalAccountSafeCas
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/7
+ * Time(创建时间)： 12:40
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class DecimalAccountSafeCas implements DecimalAccount
+{
+    AtomicReference<BigDecimal> ref;
+
+    public DecimalAccountSafeCas(BigDecimal balance)
+    {
+        ref = new AtomicReference<>(balance);
+    }
+
+    @Override
+    public BigDecimal getBalance()
+    {
+        return ref.get();
+    }
+
+    @Override
+    public void withdraw(BigDecimal amount)
+    {
+        while (true)
+        {
+            BigDecimal prev = ref.get();
+            BigDecimal next = prev.subtract(amount);
+            if (ref.compareAndSet(prev, next))
+            {
+                break;
+            }
+        }
+    }
+}
+```
+
+
+
+
+
+#### 测试
+
+```java
+package mao.t1;
+
+import java.math.BigDecimal;
+
+/**
+ * Project name(项目名称)：java并发编程_原子引用
+ * Package(包名): mao.t1
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/7
+ * Time(创建时间)： 11:47
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+
+    public static void main(String[] args)
+    {
+        DecimalAccount.start(new DecimalAccountUnsafe(new BigDecimal("10000")));
+        DecimalAccount.start(new DecimalAccountSafeLock(new BigDecimal("10000")));
+        DecimalAccount.start(new DecimalAccountSafeCas(new BigDecimal("10000")));
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+剩余余额：690
+运行时间：102ms
+剩余余额：0
+运行时间：90ms
+剩余余额：0
+运行时间：94ms
+```
+
+```sh
+剩余余额：440
+运行时间：101ms
+剩余余额：0
+运行时间：92ms
+剩余余额：0
+运行时间：95ms
+```
+
+```sh
+剩余余额：170
+运行时间：107ms
+剩余余额：0
+运行时间：100ms
+剩余余额：0
+运行时间：93ms
+```
+
+
+
+
+
+
+
+### ABA 问题
+
