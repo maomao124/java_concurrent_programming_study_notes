@@ -14402,3 +14402,397 @@ public class Test
 
 
 
+### 基本使用
+
+```java
+package mao.t1;
+
+import java.util.concurrent.atomic.LongAdder;
+
+/**
+ * Project name(项目名称)：java并发编程_原子累加器
+ * Package(包名): mao.t1
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/7
+ * Time(创建时间)： 16:22
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    public static void main(String[] args)
+    {
+        LongAdder longAdder = new LongAdder();
+        for (int i = 0; i < 100; i++)
+        {
+            longAdder.increment();
+        }
+        System.out.println(longAdder.longValue());
+    }
+}
+```
+
+
+
+```sh
+100
+```
+
+
+
+
+
+### 累加器性能比较
+
+
+
+```java
+package mao.t2;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.LongAdder;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
+
+/**
+ * Project name(项目名称)：java并发编程_原子累加器
+ * Package(包名): mao.t2
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/7
+ * Time(创建时间)： 16:27
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    private static <T> void demo(Supplier<T> adderSupplier, Consumer<T> action)
+    {
+        T adder = adderSupplier.get();
+        long start = System.nanoTime();
+        List<Thread> threads = new ArrayList<>();
+        for (int i = 0; i < 50; i++)
+        {
+            threads.add(new Thread(() ->
+            {
+                for (int j = 0; j < 1000000; j++)
+                {
+                    action.accept(adder);
+                }
+            }));
+        }
+        threads.forEach(Thread::start);
+        threads.forEach(t ->
+        {
+            try
+            {
+                t.join();
+            }
+            catch (InterruptedException e)
+            {
+                e.printStackTrace();
+            }
+        });
+        long end = System.nanoTime();
+        System.out.println(adder + " 花费的时间:" + (end - start) / 1000_000 + "ms");
+    }
+
+    public static void main(String[] args)
+    {
+        int total = 10;
+        System.out.println("AtomicLong");
+        for (int i = 0; i < total; i++)
+        {
+            demo(AtomicLong::new, AtomicLong::getAndIncrement);
+        }
+        System.out.println("---------------");
+        System.out.println("LongAdder");
+        for (int i = 0; i < total; i++)
+        {
+            demo(LongAdder::new, LongAdder::increment);
+        }
+
+    }
+
+}
+```
+
+
+
+运行结果：
+
+```sh
+AtomicLong
+50000000 花费的时间:802ms
+50000000 花费的时间:795ms
+50000000 花费的时间:780ms
+50000000 花费的时间:784ms
+50000000 花费的时间:783ms
+50000000 花费的时间:792ms
+50000000 花费的时间:762ms
+50000000 花费的时间:785ms
+50000000 花费的时间:783ms
+50000000 花费的时间:778ms
+---------------
+LongAdder
+50000000 花费的时间:56ms
+50000000 花费的时间:35ms
+50000000 花费的时间:32ms
+50000000 花费的时间:36ms
+50000000 花费的时间:31ms
+50000000 花费的时间:34ms
+50000000 花费的时间:34ms
+50000000 花费的时间:28ms
+50000000 花费的时间:29ms
+50000000 花费的时间:29ms
+```
+
+```sh
+AtomicLong
+50000000 花费的时间:799ms
+50000000 花费的时间:788ms
+50000000 花费的时间:756ms
+50000000 花费的时间:781ms
+50000000 花费的时间:775ms
+50000000 花费的时间:779ms
+50000000 花费的时间:775ms
+50000000 花费的时间:770ms
+50000000 花费的时间:781ms
+50000000 花费的时间:774ms
+---------------
+LongAdder
+50000000 花费的时间:51ms
+50000000 花费的时间:31ms
+50000000 花费的时间:29ms
+50000000 花费的时间:50ms
+50000000 花费的时间:34ms
+50000000 花费的时间:32ms
+50000000 花费的时间:32ms
+50000000 花费的时间:31ms
+50000000 花费的时间:32ms
+50000000 花费的时间:30ms
+```
+
+```sh
+AtomicLong
+50000000 花费的时间:795ms
+50000000 花费的时间:809ms
+50000000 花费的时间:765ms
+50000000 花费的时间:784ms
+50000000 花费的时间:792ms
+50000000 花费的时间:785ms
+50000000 花费的时间:789ms
+50000000 花费的时间:789ms
+50000000 花费的时间:776ms
+50000000 花费的时间:770ms
+---------------
+LongAdder
+50000000 花费的时间:43ms
+50000000 花费的时间:28ms
+50000000 花费的时间:31ms
+50000000 花费的时间:37ms
+50000000 花费的时间:27ms
+50000000 花费的时间:27ms
+50000000 花费的时间:28ms
+50000000 花费的时间:27ms
+50000000 花费的时间:29ms
+50000000 花费的时间:28ms
+```
+
+
+
+性能提升的原因很简单，就是在有竞争时，设置多个累加单元，Therad-0 累加 Cell[0]，而 Thread-1 累加 Cell[1]... 最后将结果汇总。这样它们在累加时操作的不同的 Cell 变量，因此减少了 CAS 重试失败，从而提高性能
+
+
+
+
+
+### cas 锁
+
+
+
+```java
+package mao.t3;
+
+import java.util.concurrent.atomic.AtomicInteger;
+
+/**
+ * Project name(项目名称)：java并发编程_原子累加器
+ * Package(包名): mao.t3
+ * Class(类名): LockCas
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/7
+ * Time(创建时间)： 16:40
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class LockCas
+{
+    private final AtomicInteger state = new AtomicInteger(0);
+
+    public void lock()
+    {
+        while (true)
+        {
+            if (state.compareAndSet(0, 1))
+            {
+                break;
+            }
+        }
+        System.out.println("lock");
+    }
+
+    public void unlock()
+    {
+        System.out.println("unlock");
+        state.set(0);
+    }
+
+}
+```
+
+
+
+```java
+package mao.t3;
+
+/**
+ * Project name(项目名称)：java并发编程_原子累加器
+ * Package(包名): mao.t3
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/7
+ * Time(创建时间)： 16:42
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    public static void main(String[] args) throws InterruptedException
+    {
+        LockCas lockCas = new LockCas();
+
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                lockCas.lock();
+                try
+                {
+                    Thread.sleep(5000);
+                }
+                catch (InterruptedException e)
+                {
+                    e.printStackTrace();
+                }
+                finally
+                {
+                    System.out.println("t1线程释放锁");
+                    lockCas.unlock();
+                }
+            }
+        }, "t1").start();
+
+        Thread.sleep(100);
+        System.out.println("主线程尝试获取锁");
+        lockCas.lock();
+        System.out.println("主线程获取锁成功");
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+lock
+主线程尝试获取锁
+t1线程释放锁
+unlock
+lock
+主线程获取锁成功
+```
+
+
+
+
+
+注意：**不能用于实践，因为获取锁失败的时候不是进入阻塞，而是一直使用CPU做无用功**
+
+
+
+```java
+package mao.t3;
+
+/**
+ * Project name(项目名称)：java并发编程_原子累加器
+ * Package(包名): mao.t3
+ * Class(类名): Test2
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/7
+ * Time(创建时间)： 16:46
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test2
+{
+    public static void main(String[] args)
+    {
+        for (int i = 0; i < 15; i++)
+        {
+            new Thread(new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    try
+                    {
+                        Test.main(null);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                }
+            }).start();
+        }
+    }
+}
+```
+
+
+
+![image-20220907165256696](img/java并发编程学习笔记/image-20220907165256696.png)
+
+
+
+
+
+
+
+
+
+
+
+## Unsafe
+
