@@ -14796,3 +14796,187 @@ public class Test2
 
 ## Unsafe
 
+Unsafe 对象提供了非常底层的，操作内存、线程的方法，Unsafe 对象不能直接调用，只能通过反射获得
+
+
+
+![image-20220907170901374](img/java并发编程学习笔记/image-20220907170901374.png)
+
+
+
+
+
+
+
+```java
+package mao.t1;
+
+import sun.misc.Unsafe;
+
+import java.lang.reflect.Field;
+
+/**
+ * Project name(项目名称)：java并发编程_Unsafe
+ * Package(包名): mao.t1
+ * Class(类名): UnsafeAccessor
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/7
+ * Time(创建时间)： 17:05
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class UnsafeAccessor
+{
+    private static final Unsafe unsafe;
+
+    static
+    {
+        try
+        {
+            Field theUnsafe = Unsafe.class.getDeclaredField("theUnsafe");
+            theUnsafe.setAccessible(true);
+            unsafe = (Unsafe) theUnsafe.get(null);
+        }
+        catch (NoSuchFieldException | IllegalAccessException e)
+        {
+            throw new Error(e);
+        }
+    }
+
+    static Unsafe getUnsafe()
+    {
+        return unsafe;
+    }
+}
+```
+
+
+
+```java
+package mao.t1;
+
+/**
+ * Project name(项目名称)：java并发编程_Unsafe
+ * Package(包名): mao.t1
+ * Class(类名): Student
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/7
+ * Time(创建时间)： 17:09
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Student
+{
+    /**
+     * id
+     */
+    public volatile int id;
+    /**
+     * 名字
+     */
+    public volatile String name;
+
+    @Override
+    @SuppressWarnings("all")
+    public String toString()
+    {
+        final StringBuilder stringbuilder = new StringBuilder();
+        stringbuilder.append("id：").append(id).append('\n');
+        stringbuilder.append("name：").append(name).append('\n');
+        return stringbuilder.toString();
+    }
+}
+```
+
+
+
+```java
+package mao.t1;
+
+
+import sun.misc.Unsafe;
+
+import java.lang.reflect.Field;
+
+/**
+ * Project name(项目名称)：java并发编程_Unsafe
+ * Package(包名): mao.t1
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/7
+ * Time(创建时间)： 17:04
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    public static void main(String[] args) throws NoSuchFieldException
+    {
+        Unsafe unsafe = UnsafeAccessor.getUnsafe();
+        System.out.println(unsafe);
+
+        Field id = Student.class.getDeclaredField("id");
+        Field name = Student.class.getDeclaredField("name");
+        // 获得成员变量的偏移量
+        long idOffset = unsafe.objectFieldOffset(id);
+        long nameOffset = unsafe.objectFieldOffset(name);
+
+        System.out.println(idOffset);
+        System.out.println(nameOffset);
+
+        Student student = new Student();
+        System.out.println(student);
+
+        // 使用 cas 方法替换成员变量的值
+        unsafe.compareAndSwapInt(student, idOffset, 0, 18);
+        unsafe.compareAndSwapObject(student, nameOffset, null, "张三");
+
+        System.out.println(student);
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+sun.misc.Unsafe@682a0b20
+12
+16
+id：0
+name：null
+
+id：18
+name：张三
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# 共享模型之不可变
+
