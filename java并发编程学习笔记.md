@@ -14126,3 +14126,279 @@ public class Test
 
 ## 字段更新器
 
+* AtomicReferenceFieldUpdater 
+* AtomicIntegerFieldUpdater
+* AtomicLongFieldUpdater
+
+
+
+利用字段更新器，可以针对对象的某个域（Field）进行原子操作，只能配合 volatile 修饰的字段使用，否则会出现异常
+
+
+
+
+
+学生类：
+
+```java
+package mao;
+
+/**
+ * Project name(项目名称)：java并发编程_字段更新器
+ * Package(包名): mao
+ * Class(类名): Student
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/7
+ * Time(创建时间)： 15:56
+ * Version(版本): 1.0
+ * Description(描述)： 字段不设置成public不然无法使用
+ */
+
+public class Student
+{
+    /**
+     * id
+     */
+    public volatile long id;
+
+    /**
+     * 名字
+     */
+    public volatile String name;
+
+    /**
+     * 年龄
+     */
+    public volatile int age;
+
+    public Student(long id, String name, int age)
+    {
+        this.id = id;
+        this.name = name;
+        this.age = age;
+    }
+
+    public Student()
+    {
+    }
+
+    public long getId()
+    {
+        return id;
+    }
+
+    public Student setId(long id)
+    {
+        this.id = id;
+        return this;
+    }
+
+    public String getName()
+    {
+        return name;
+    }
+
+    public Student setName(String name)
+    {
+        this.name = name;
+        return this;
+    }
+
+    public int getAge()
+    {
+        return age;
+    }
+
+    public Student setAge(int age)
+    {
+        this.age = age;
+        return this;
+    }
+
+    @Override
+    @SuppressWarnings("all")
+    public String toString()
+    {
+        final StringBuilder stringbuilder = new StringBuilder();
+        stringbuilder.append("id：").append(id).append('\n');
+        stringbuilder.append("name：").append(name).append('\n');
+        stringbuilder.append("age：").append(age).append('\n');
+        return stringbuilder.toString();
+    }
+}
+```
+
+
+
+
+
+### AtomicIntegerFieldUpdater
+
+```java
+package mao.t1;
+
+import mao.Student;
+
+import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
+
+/**
+ * Project name(项目名称)：java并发编程_字段更新器
+ * Package(包名): mao.t1
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/7
+ * Time(创建时间)： 15:59
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    public static void main(String[] args)
+    {
+        Student student = new Student();
+        student.setId(101L).setName("张三").setAge(18);
+
+        AtomicIntegerFieldUpdater<Student> atomicIntegerFieldUpdater
+                = AtomicIntegerFieldUpdater.newUpdater(Student.class, "age");
+
+        System.out.println(atomicIntegerFieldUpdater.getAndSet(student, 21));
+        int age = atomicIntegerFieldUpdater.get(student);
+        System.out.println(age);
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+18
+21
+```
+
+
+
+
+
+### AtomicLongFieldUpdater
+
+
+
+```java
+package mao.t2;
+
+import mao.Student;
+
+import java.util.concurrent.atomic.AtomicLongFieldUpdater;
+
+/**
+ * Project name(项目名称)：java并发编程_字段更新器
+ * Package(包名): mao.t2
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/7
+ * Time(创建时间)： 16:11
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    public static void main(String[] args)
+    {
+        Student student = new Student();
+        student.setId(101L).setName("张三").setAge(18);
+
+        AtomicLongFieldUpdater<Student> atomicLongFieldUpdater
+                = AtomicLongFieldUpdater.newUpdater(Student.class, "id");
+
+        long id = atomicLongFieldUpdater.getAndSet(student, 103);
+        System.out.println(id);
+        System.out.println(atomicLongFieldUpdater.get(student));
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+101
+103
+```
+
+
+
+
+
+### AtomicReferenceFieldUpdater 
+
+
+
+```java
+package mao.t3;
+
+import mao.Student;
+
+import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
+
+/**
+ * Project name(项目名称)：java并发编程_字段更新器
+ * Package(包名): mao.t3
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/7
+ * Time(创建时间)： 16:13
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    public static void main(String[] args)
+    {
+        Student student = new Student();
+        student.setId(101L).setName("张三").setAge(18);
+
+        AtomicReferenceFieldUpdater<Student, String> atomicReferenceFieldUpdater
+                = AtomicReferenceFieldUpdater.newUpdater(Student.class, String.class, "name");
+
+        String name = atomicReferenceFieldUpdater.getAndSet(student, "李四");
+        System.out.println(name);
+        System.out.println(atomicReferenceFieldUpdater.get(student));
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+张三
+李四
+```
+
+
+
+
+
+
+
+
+
+## 原子累加器
+
+
+
