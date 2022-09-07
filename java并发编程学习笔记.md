@@ -13583,3 +13583,546 @@ public class Test
 
 ### ABA 问题
 
+```java
+package mao.t2;
+
+import java.util.concurrent.atomic.AtomicReference;
+
+/**
+ * Project name(项目名称)：java并发编程_原子引用
+ * Package(包名): mao.t2
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/7
+ * Time(创建时间)： 12:54
+ * Version(版本): 1.0
+ * Description(描述)： ABA 问题
+ */
+
+public class Test
+{
+    private static final AtomicReference<String> ref = new AtomicReference<>("A");
+
+    /**
+     * 睡眠
+     *
+     * @param time 时间
+     */
+    private static void sleep(long time)
+    {
+        try
+        {
+            Thread.sleep(time);
+        }
+        catch (InterruptedException e)
+        {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * 改变
+     */
+    private static void change()
+    {
+        new Thread(() ->
+        {
+            System.out.println("t1线程A改B：" + ref.compareAndSet(ref.get(), "B"));
+        }, "t1").start();
+        sleep(500);
+        new Thread(() ->
+        {
+            System.out.println("t2线程B改A：" + ref.compareAndSet(ref.get(), "A"));
+        }, "t2").start();
+
+    }
+
+    public static void main(String[] args)
+    {
+        String prev = ref.get();
+        change();
+        sleep(1000);
+        System.out.println("main线程A改为C：" + ref.compareAndSet(prev, "C"));
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+t1线程A改B：true
+t2线程B改A：true
+main线程A改为C：true
+```
+
+
+
+主线程仅能判断出共享变量的值与最初值 A 是否相同，不能感知到这种从 A 改为 B 又 改回 A 的情况，如果主线程希望只要有其它线程**动过了**共享变量，那么自己的 cas 就算失败，这时，仅比较值是不够的，需要再加一个版本号，这就需要使用到**AtomicStampedReference**
+
+
+
+
+
+### AtomicStampedReference
+
+```java
+package mao.t3;
+
+
+import java.util.concurrent.atomic.AtomicStampedReference;
+
+/**
+ * Project name(项目名称)：java并发编程_原子引用
+ * Package(包名): mao.t3
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/7
+ * Time(创建时间)： 13:03
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    private static final AtomicStampedReference<String> ref = new AtomicStampedReference<>("A", 0);
+
+    /**
+     * 睡眠
+     *
+     * @param time 时间
+     */
+    private static void sleep(long time)
+    {
+        try
+        {
+            Thread.sleep(time);
+        }
+        catch (InterruptedException e)
+        {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * 改变
+     */
+    private static void change()
+    {
+        new Thread(() ->
+        {
+            System.out.println("t1线程A改B：" + ref.compareAndSet(ref.getReference(),
+                    "B", ref.getStamp(), ref.getStamp() + 1));
+        }, "t1").start();
+        sleep(500);
+        new Thread(() ->
+        {
+            System.out.println("t2线程B改A：" + ref.compareAndSet(ref.getReference(),
+                    "A", ref.getStamp(), ref.getStamp() + 1));
+        }, "t2").start();
+
+    }
+
+    public static void main(String[] args)
+    {
+        String prev = ref.getReference();
+        //版本号
+        int stamp = ref.getStamp();
+        change();
+        sleep(1000);
+        System.out.println("main线程A改为C：" + ref.compareAndSet(prev, "C", stamp, stamp + 1));
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+t1线程A改B：true
+t2线程B改A：true
+main线程A改为C：false
+```
+
+
+
+AtomicStampedReference 可以给原子引用加上版本号，追踪原子引用整个的变化过程，如： A -> B -> A -> C ，通过AtomicStampedReference，我们可以知道，引用变量中途被更改了几次
+
+
+
+
+
+### AtomicMarkableReference
+
+但是有时候，并不关心引用变量更改了几次，只是单纯的关心是否更改过，所以就有了 AtomicMarkableReference
+
+
+
+```java
+package mao.t4;
+
+import java.util.concurrent.atomic.AtomicMarkableReference;
+
+/**
+ * Project name(项目名称)：java并发编程_原子引用
+ * Package(包名): mao.t4
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/7
+ * Time(创建时间)： 13:12
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    private static final AtomicMarkableReference<String> ref = new AtomicMarkableReference<>("A", true);
+
+    /**
+     * 睡眠
+     *
+     * @param time 时间
+     */
+    private static void sleep(long time)
+    {
+        try
+        {
+            Thread.sleep(time);
+        }
+        catch (InterruptedException e)
+        {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * 改变
+     */
+    private static void change()
+    {
+        new Thread(() ->
+        {
+            System.out.println("t1线程A改B：" + ref.compareAndSet(ref.getReference(), "B", ref.isMarked(), false));
+        }, "t1").start();
+        sleep(500);
+        new Thread(() ->
+        {
+            System.out.println("t2线程B改A：" + ref.compareAndSet(ref.getReference(), "A", ref.isMarked(), false));
+        }, "t2").start();
+
+    }
+
+    public static void main(String[] args)
+    {
+        String prev = ref.getReference();
+        boolean marked = ref.isMarked();
+        change();
+        sleep(1000);
+        System.out.println("main线程A改为C：" + ref.compareAndSet(prev, "C", marked, false));
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+t1线程A改B：true
+t2线程B改A：true
+main线程A改为C：false
+```
+
+
+
+
+
+
+
+## 原子数组
+
+* AtomicIntegerArray 
+* AtomicLongArray 
+* AtomicReferenceArray
+
+
+
+不安全的实现：
+
+```java
+package mao.t1;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+/**
+ * Project name(项目名称)：java并发编程_原子数组
+ * Package(包名): mao.t1
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/7
+ * Time(创建时间)： 15:11
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    public static void main(String[] args)
+    {
+        long start = System.currentTimeMillis();
+        int[] integers = new int[10];
+        int total = 10000;
+        List<Thread> threads = new ArrayList<>(total);
+        for (int i = 0; i < total; i++)
+        {
+            Thread thread = new Thread(new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    for (int k = 0; k < 10; k++)
+                    {
+                        for (int j = 0; j < integers.length; j++)
+                        {
+                            integers[j] = integers[j] + 1;
+                        }
+                    }
+                }
+            }, "t" + (i + 1));
+            threads.add(thread);
+        }
+
+        threads.forEach(Thread::start);
+
+        Runtime.getRuntime().addShutdownHook(new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                long end = System.currentTimeMillis();
+                System.out.println("运行时间：" + (end - start) + "ms");
+                System.out.println(Arrays.toString(integers));
+            }
+        }));
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+运行时间：913ms
+[99995, 99994, 99994, 99994, 99994, 99993, 99993, 99994, 99992, 99993]
+```
+
+```sh
+运行时间：921ms
+[99990, 99990, 99990, 99990, 99990, 99990, 99990, 99990, 99990, 99990]
+```
+
+```sh
+运行时间：963ms
+[99987, 99987, 99988, 99987, 99985, 99985, 99985, 99985, 99987, 99987]
+```
+
+
+
+
+
+### AtomicIntegerArray 
+
+
+
+```java
+package mao.t2;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicIntegerArray;
+
+/**
+ * Project name(项目名称)：java并发编程_原子数组
+ * Package(包名): mao.t2
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/7
+ * Time(创建时间)： 15:21
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    public static void main(String[] args)
+    {
+        long start = System.currentTimeMillis();
+        AtomicIntegerArray atomicIntegerArray = new AtomicIntegerArray(10);
+        int total = 10000;
+        List<Thread> threads = new ArrayList<>(total);
+        for (int i = 0; i < total; i++)
+        {
+            Thread thread = new Thread(new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    for (int k = 0; k < 10; k++)
+                    {
+                        for (int j = 0; j < atomicIntegerArray.length(); j++)
+                        {
+                            atomicIntegerArray.incrementAndGet(j);
+                        }
+                    }
+                }
+            }, "t" + (i + 1));
+            threads.add(thread);
+        }
+
+        threads.forEach(Thread::start);
+
+        Runtime.getRuntime().addShutdownHook(new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                long end = System.currentTimeMillis();
+                System.out.println("运行时间：" + (end - start) + "ms");
+                System.out.println(atomicIntegerArray);
+            }
+        }));
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+运行时间：898ms
+[100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000]
+```
+
+```sh
+运行时间：955ms
+[100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000]
+```
+
+```sh
+运行时间：929ms
+[100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000]
+```
+
+
+
+
+
+### AtomicLongArray 
+
+```java
+package mao.t3;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicLongArray;
+
+/**
+ * Project name(项目名称)：java并发编程_原子数组
+ * Package(包名): mao.t3
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/7
+ * Time(创建时间)： 15:44
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    public static void main(String[] args)
+    {
+        long start = System.currentTimeMillis();
+        AtomicLongArray atomicLongArray = new AtomicLongArray(10);
+        int total = 10000;
+        List<Thread> threads = new ArrayList<>(total);
+        for (int i = 0; i < total; i++)
+        {
+            Thread thread = new Thread(new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    for (int k = 0; k < 10; k++)
+                    {
+                        for (int j = 0; j < atomicLongArray.length(); j++)
+                        {
+                            atomicLongArray.incrementAndGet(j);
+                        }
+                    }
+                }
+            }, "t" + (i + 1));
+            threads.add(thread);
+        }
+
+        threads.forEach(Thread::start);
+
+        Runtime.getRuntime().addShutdownHook(new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                long end = System.currentTimeMillis();
+                System.out.println("运行时间：" + (end - start) + "ms");
+                System.out.println(atomicLongArray);
+            }
+        }));
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+运行时间：917ms
+[100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000]
+```
+
+```sh
+运行时间：949ms
+[100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000]
+```
+
+```sh
+运行时间：910ms
+[100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000]
+```
+
+
+
+
+
+
+
+## 字段更新器
+
