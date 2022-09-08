@@ -16738,3 +16738,1248 @@ mao.t2.Connection@6bea52d4
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# 共享模型之工具
+
+## 线程池
+
+### 自定义线程池
+
+
+
+```java
+package mao.t1;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
+
+/**
+ * Project name(项目名称)：java并发编程_自定义线程池
+ * Package(包名): mao.t1
+ * Class(类名): BlockingQueue
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/8
+ * Time(创建时间)： 14:40
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class BlockingQueue<T>
+{
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(BlockingQueue.class);
+
+    /**
+     * 任务队列
+     */
+    private final Deque<T> queue = new ArrayDeque<>();
+
+    /**
+     * 锁
+     */
+    private final ReentrantLock lock = new ReentrantLock();
+
+    /**
+     * 生产者条件变量
+     */
+    private final Condition fullWaitSet = lock.newCondition();
+
+    /**
+     * 消费者条件变量
+     */
+    private final Condition emptyWaitSet = lock.newCondition();
+
+    /**
+     * 队列的容量
+     */
+    private int capacity;
+
+    /**
+     * 阻塞队列
+     *
+     * @param capacity 队列的容量
+     */
+    public BlockingQueue(int capacity)
+    {
+        this.capacity = capacity;
+    }
+
+    /**
+     * 阻塞获取
+     *
+     * @return {@link T}
+     */
+    public T take()
+    {
+        lock.lock();
+        try
+        {
+            //队列为空，则一直等待
+            while (queue.isEmpty())
+            {
+                try
+                {
+                    //消费者条件变量
+                    emptyWaitSet.await();
+                }
+                catch (InterruptedException e)
+                {
+                    e.printStackTrace();
+                }
+            }
+            //不为空
+            T t = queue.removeFirst();
+            //唤醒生产者条件变量里的线程
+            fullWaitSet.signal();
+            return t;
+        }
+        finally
+        {
+            lock.unlock();
+        }
+    }
+
+    /**
+     * 阻塞添加
+     *
+     * @param task 任务
+     */
+    public void put(T task)
+    {
+        lock.lock();
+        try
+        {
+            //队列已满，则一直等待
+            while (queue.size() == capacity)
+            {
+                log.debug("等待加入任务队列：" + task);
+                try
+                {
+                    fullWaitSet.await();
+                }
+                catch (InterruptedException e)
+                {
+                    e.printStackTrace();
+                }
+            }
+            //队列不为满
+            log.debug("加入任务队列：" + task);
+            queue.addLast(task);
+            emptyWaitSet.signal();
+        }
+        finally
+        {
+            lock.unlock();
+        }
+    }
+
+    /**
+     * 带超时阻塞获取
+     *
+     * @param timeout 超时
+     * @param unit    单位
+     * @return {@link T}
+     */
+    public T poll(long timeout, TimeUnit unit)
+    {
+        lock.lock();
+        try
+        {
+            long nanos = unit.toNanos(timeout);
+            //队列为空，则一直等待
+            while (queue.isEmpty())
+            {
+                try
+                {
+                    if (nanos <= 0)
+                    {
+                        return null;
+                    }
+                    nanos = emptyWaitSet.awaitNanos(nanos);
+                }
+                catch (InterruptedException e)
+                {
+                    e.printStackTrace();
+                }
+            }
+            //不为空
+            T t = queue.removeFirst();
+            //唤醒生产者条件变量里的线程
+            fullWaitSet.signal();
+            return t;
+        }
+        finally
+        {
+            lock.unlock();
+        }
+    }
+
+    /**
+     * 带超时时间阻塞添加
+     *
+     * @param task     任务
+     * @param timeout  超时
+     * @param timeUnit 时间单位
+     * @return boolean
+     */
+    public boolean offer(T task, long timeout, TimeUnit timeUnit)
+    {
+        lock.lock();
+        try
+        {
+            long nanos = timeUnit.toNanos(timeout);
+            //队列已满，则一直等待
+            while (queue.size() == capacity)
+            {
+                if (nanos <= 0)
+                {
+                    return false;
+                }
+                log.debug("等待加入任务队列：" + task);
+                try
+                {
+                    nanos = fullWaitSet.awaitNanos(nanos);
+                }
+                catch (InterruptedException e)
+                {
+                    e.printStackTrace();
+                }
+            }
+            //队列不为满
+            log.debug("加入任务队列：" + task);
+            queue.addLast(task);
+            emptyWaitSet.signal();
+            return true;
+        }
+        finally
+        {
+            lock.unlock();
+        }
+    }
+
+    /**
+     * 获取队列大小
+     *
+     * @return int
+     */
+    public int size()
+    {
+        lock.lock();
+        try
+        {
+            return queue.size();
+        }
+        finally
+        {
+            lock.unlock();
+        }
+    }
+
+    /**
+     * @param rejectPolicy 拒绝策略
+     * @param task         任务
+     */
+    public void tryPut(RejectPolicy<T> rejectPolicy, T task)
+    {
+        lock.lock();
+        try
+        {
+            // 判断队列是否满
+            if (queue.size() == capacity)
+            {
+                rejectPolicy.reject(this, task);
+            }
+            else
+            {
+                log.debug("加入任务队列：" + task);
+                queue.addLast(task);
+                emptyWaitSet.signal();
+            }
+        }
+        finally
+        {
+            lock.unlock();
+        }
+    }
+}
+```
+
+
+
+
+
+```java
+package mao.t1;
+
+
+/**
+ * Project name(项目名称)：java并发编程_自定义线程池
+ * Package(包名): mao.t1
+ * Interface(接口名): RejectPolicy
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/8
+ * Time(创建时间)： 14:38
+ * Version(版本): 1.0
+ * Description(描述)： 自定义拒绝策略接口
+ */
+
+@FunctionalInterface
+interface RejectPolicy<T>
+{
+    void reject(BlockingQueue<T> queue, T task);
+}
+```
+
+
+
+
+
+```java
+package mao.t1;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.HashSet;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * Project name(项目名称)：java并发编程_自定义线程池
+ * Package(包名): mao.t1
+ * Class(类名): ThreadPool
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/8
+ * Time(创建时间)： 15:03
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class ThreadPool
+{
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(ThreadPool.class);
+
+    /**
+     * 任务队列
+     */
+    private final BlockingQueue<Runnable> taskQueue;
+
+    /**
+     * 线程集合
+     */
+    private final HashSet<Worker> workers = new HashSet<>();
+
+    /**
+     * 核心线程数大小
+     */
+    private final int coreSize;
+
+    /**
+     * 获取任务时的超时时间
+     */
+    private final long timeout;
+
+    /**
+     * 时间单位
+     */
+    private final TimeUnit timeUnit;
+
+    /**
+     * 拒绝策略
+     */
+    private final RejectPolicy<Runnable> rejectPolicy;
+
+    /**
+     * 构造方法，线程池
+     *
+     * @param coreSize     核心线程数大小
+     * @param timeout      超时时间
+     * @param timeUnit     时间单位
+     * @param queueSize    队列大小
+     * @param rejectPolicy 拒绝策略
+     */
+    public ThreadPool(int coreSize, long timeout, TimeUnit timeUnit, int queueSize,
+                      RejectPolicy<Runnable> rejectPolicy)
+    {
+        this.coreSize = coreSize;
+        this.timeout = timeout;
+        this.timeUnit = timeUnit;
+        this.taskQueue = new BlockingQueue<>(queueSize);
+        this.rejectPolicy = rejectPolicy;
+    }
+
+
+    /**
+     * 执行任务
+     *
+     * @param task 任务
+     */
+    public void execute(Runnable task)
+    {
+        synchronized (workers)
+        {
+            //// 当任务数没有超过coreSize时，直接交给worker对象执行
+            if (workers.size() < coreSize)
+            {
+                Worker worker = new Worker(task);
+                log.debug("task加入到队列 workers  task:" + task + "    worker:" + worker);
+                workers.add(worker);
+                worker.start();
+            }
+            //任务数超过 coreSize
+            else
+            {
+                //选择策略：
+
+                //1.一直等待
+                //taskQueue.put(task);
+                //2.超时等待
+                //taskQueue.offer(task, timeout, timeUnit);
+                //3.抛出异常，不加入等待队列
+                //throw new RuntimeException("workers队列已满! task无法加入：" + task);
+                //4.放弃任务执行，不加入等待队列
+                //log.warn("workers队列已满！task被丢弃：" + task);
+                //5.由调用者决定，队列满时...
+                taskQueue.tryPut(rejectPolicy, task);
+            }
+        }
+    }
+
+
+    class Worker extends Thread
+    {
+        /**
+         * 任务
+         */
+        private Runnable task;
+
+        /**
+         * 构造方法
+         *
+         * @param task 任务
+         */
+        public Worker(Runnable task)
+        {
+            this.task = task;
+        }
+
+
+        @Override
+        public void run()
+        {
+            // 当 task 不为空，执行任务
+            //当 task 执行完毕，再接着从任务队列获取任务并执行
+            while (task != null || (task = taskQueue.poll(timeout, timeUnit)) != null)
+            {
+                try
+                {
+                    log.debug("正在执行任务：" + task);
+                    task.run();
+                }
+                catch (Exception e)
+                {
+                    e.printStackTrace();
+                }
+                finally
+                {
+                    //设置为空，不然会影响下一次的判断
+                    task = null;
+                }
+            }
+            //队列里也没有任务了
+            //移除
+            synchronized (workers)
+            {
+                log.debug("worker 被移除" + this);
+                workers.remove(this);
+            }
+        }
+    }
+
+}
+```
+
+
+
+
+
+```java
+package mao.t1;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.TimeUnit;
+
+/**
+ * Project name(项目名称)：java并发编程_自定义线程池
+ * Package(包名): mao.t1
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/8
+ * Time(创建时间)： 14:38
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args)
+    {
+        ThreadPool threadPool = new ThreadPool(2, 3, TimeUnit.SECONDS, 10, new RejectPolicy<Runnable>()
+        {
+            @Override
+            public void reject(BlockingQueue<Runnable> queue, Runnable task)
+            {
+                queue.put(task);
+            }
+        });
+
+        for (int i = 0; i < 5; i++)
+        {
+            threadPool.execute(new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    try
+                    {
+                        Thread.sleep(2000);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                }
+            });
+        }
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-08  20:03:44.199  [main] DEBUG mao.t1.ThreadPool:  task加入到队列 workers  task:mao.t1.Test$2@56cdfb3b    worker:Thread[Thread-0,5,main]
+2022-09-08  20:03:44.201  [main] DEBUG mao.t1.ThreadPool:  task加入到队列 workers  task:mao.t1.Test$2@306e95ec    worker:Thread[Thread-1,5,main]
+2022-09-08  20:03:44.202  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@6fd83fc1
+2022-09-08  20:03:44.202  [Thread-0] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@56cdfb3b
+2022-09-08  20:03:44.202  [Thread-1] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@306e95ec
+2022-09-08  20:03:44.202  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@4f2b503c
+2022-09-08  20:03:44.202  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@bae7dc0
+2022-09-08  20:03:46.213  [Thread-1] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@6fd83fc1
+2022-09-08  20:03:46.213  [Thread-0] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@4f2b503c
+2022-09-08  20:03:48.227  [Thread-0] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@bae7dc0
+2022-09-08  20:03:51.235  [Thread-1] DEBUG mao.t1.ThreadPool:  worker 被移除Thread[Thread-1,5,main]
+2022-09-08  20:03:53.241  [Thread-0] DEBUG mao.t1.ThreadPool:  worker 被移除Thread[Thread-0,5,main]
+```
+
+
+
+
+
+更改线程池大小
+
+```java
+package mao.t1;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.TimeUnit;
+
+/**
+ * Project name(项目名称)：java并发编程_自定义线程池
+ * Package(包名): mao.t1
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/8
+ * Time(创建时间)： 14:38
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args)
+    {
+        ThreadPool threadPool = new ThreadPool(3, 3, TimeUnit.SECONDS, 10, new RejectPolicy<Runnable>()
+        {
+            @Override
+            public void reject(BlockingQueue<Runnable> queue, Runnable task)
+            {
+                queue.put(task);
+            }
+        });
+
+        for (int i = 0; i < 5; i++)
+        {
+            threadPool.execute(new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    try
+                    {
+                        Thread.sleep(2000);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                }
+            });
+        }
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-08  20:10:18.656  [main] DEBUG mao.t1.ThreadPool:  task加入到队列 workers  task:mao.t1.Test$2@56cdfb3b    worker:Thread[Thread-0,5,main]
+2022-09-08  20:10:18.658  [main] DEBUG mao.t1.ThreadPool:  task加入到队列 workers  task:mao.t1.Test$2@306e95ec    worker:Thread[Thread-1,5,main]
+2022-09-08  20:10:18.659  [main] DEBUG mao.t1.ThreadPool:  task加入到队列 workers  task:mao.t1.Test$2@6fd83fc1    worker:Thread[Thread-2,5,main]
+2022-09-08  20:10:18.659  [Thread-1] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@306e95ec
+2022-09-08  20:10:18.659  [Thread-0] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@56cdfb3b
+2022-09-08  20:10:18.659  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@bae7dc0
+2022-09-08  20:10:18.659  [Thread-2] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@6fd83fc1
+2022-09-08  20:10:18.659  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@209da20d
+2022-09-08  20:10:20.661  [Thread-1] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@bae7dc0
+2022-09-08  20:10:20.675  [Thread-0] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@209da20d
+2022-09-08  20:10:23.675  [Thread-2] DEBUG mao.t1.ThreadPool:  worker 被移除Thread[Thread-2,5,main]
+2022-09-08  20:10:25.671  [Thread-1] DEBUG mao.t1.ThreadPool:  worker 被移除Thread[Thread-1,5,main]
+2022-09-08  20:10:25.687  [Thread-0] DEBUG mao.t1.ThreadPool:  worker 被移除Thread[Thread-0,5,main]
+```
+
+
+
+
+
+更改加入的线程数
+
+```java
+package mao.t1;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.TimeUnit;
+
+/**
+ * Project name(项目名称)：java并发编程_自定义线程池
+ * Package(包名): mao.t1
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/8
+ * Time(创建时间)： 14:38
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args)
+    {
+        ThreadPool threadPool = new ThreadPool(3, 3, TimeUnit.SECONDS, 10, new RejectPolicy<Runnable>()
+        {
+            @Override
+            public void reject(BlockingQueue<Runnable> queue, Runnable task)
+            {
+                queue.put(task);
+            }
+        });
+
+        for (int i = 0; i < 20; i++)
+        {
+            int finalI = i;
+            threadPool.execute(new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    try
+                    {
+                        Thread.sleep(2000);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                    log.debug("" + finalI);
+                }
+            });
+        }
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-08  20:18:06.494  [main] DEBUG mao.t1.ThreadPool:  task加入到队列 workers  task:mao.t1.Test$2@56cdfb3b    worker:Thread[Thread-0,5,main]
+2022-09-08  20:18:06.496  [main] DEBUG mao.t1.ThreadPool:  task加入到队列 workers  task:mao.t1.Test$2@306e95ec    worker:Thread[Thread-1,5,main]
+2022-09-08  20:18:06.497  [main] DEBUG mao.t1.ThreadPool:  task加入到队列 workers  task:mao.t1.Test$2@6fd83fc1    worker:Thread[Thread-2,5,main]
+2022-09-08  20:18:06.497  [Thread-1] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@306e95ec
+2022-09-08  20:18:06.497  [Thread-0] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@56cdfb3b
+2022-09-08  20:18:06.497  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@bae7dc0
+2022-09-08  20:18:06.497  [Thread-2] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@6fd83fc1
+2022-09-08  20:18:06.497  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@209da20d
+2022-09-08  20:18:06.497  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@e15b7e8
+2022-09-08  20:18:06.497  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@1b2abca6
+2022-09-08  20:18:06.497  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@6392827e
+2022-09-08  20:18:06.497  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@2ed2d9cb
+2022-09-08  20:18:06.498  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@d5b810e
+2022-09-08  20:18:06.498  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@43dac38f
+2022-09-08  20:18:06.498  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@342c38f8
+2022-09-08  20:18:06.498  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@c88a337
+2022-09-08  20:18:06.498  [main] DEBUG mao.t1.BlockingQueue:  等待加入任务队列：mao.t1.Test$2@5d0a1059
+2022-09-08  20:18:08.501  [Thread-1] DEBUG mao.t1.Test:  1
+2022-09-08  20:18:08.501  [Thread-2] DEBUG mao.t1.Test:  2
+2022-09-08  20:18:08.501  [Thread-0] DEBUG mao.t1.Test:  0
+2022-09-08  20:18:08.502  [Thread-1] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@bae7dc0
+2022-09-08  20:18:08.502  [Thread-2] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@209da20d
+2022-09-08  20:18:08.502  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@5d0a1059
+2022-09-08  20:18:08.502  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@593aaf41
+2022-09-08  20:18:08.502  [main] DEBUG mao.t1.BlockingQueue:  等待加入任务队列：mao.t1.Test$2@5a56cdac
+2022-09-08  20:18:08.502  [Thread-0] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@e15b7e8
+2022-09-08  20:18:08.502  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@5a56cdac
+2022-09-08  20:18:08.503  [main] DEBUG mao.t1.BlockingQueue:  等待加入任务队列：mao.t1.Test$2@7c711375
+2022-09-08  20:18:10.502  [Thread-1] DEBUG mao.t1.Test:  3
+2022-09-08  20:18:10.502  [Thread-2] DEBUG mao.t1.Test:  4
+2022-09-08  20:18:10.502  [Thread-1] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@1b2abca6
+2022-09-08  20:18:10.502  [Thread-2] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@6392827e
+2022-09-08  20:18:10.502  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@7c711375
+2022-09-08  20:18:10.502  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@57cf54e1
+2022-09-08  20:18:10.502  [main] DEBUG mao.t1.BlockingQueue:  等待加入任务队列：mao.t1.Test$2@5b03b9fe
+2022-09-08  20:18:10.517  [Thread-0] DEBUG mao.t1.Test:  5
+2022-09-08  20:18:10.517  [Thread-0] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@2ed2d9cb
+2022-09-08  20:18:10.517  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@5b03b9fe
+2022-09-08  20:18:10.517  [main] DEBUG mao.t1.BlockingQueue:  等待加入任务队列：mao.t1.Test$2@37d4349f
+2022-09-08  20:18:12.514  [Thread-1] DEBUG mao.t1.Test:  6
+2022-09-08  20:18:12.514  [Thread-2] DEBUG mao.t1.Test:  7
+2022-09-08  20:18:12.514  [Thread-1] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@d5b810e
+2022-09-08  20:18:12.514  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@37d4349f
+2022-09-08  20:18:12.514  [Thread-2] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@43dac38f
+2022-09-08  20:18:12.530  [Thread-0] DEBUG mao.t1.Test:  8
+2022-09-08  20:18:12.530  [Thread-0] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@342c38f8
+2022-09-08  20:18:14.525  [Thread-1] DEBUG mao.t1.Test:  9
+2022-09-08  20:18:14.525  [Thread-2] DEBUG mao.t1.Test:  10
+2022-09-08  20:18:14.525  [Thread-2] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@c88a337
+2022-09-08  20:18:14.525  [Thread-1] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@5d0a1059
+2022-09-08  20:18:14.541  [Thread-0] DEBUG mao.t1.Test:  11
+2022-09-08  20:18:14.541  [Thread-0] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@593aaf41
+2022-09-08  20:18:16.530  [Thread-1] DEBUG mao.t1.Test:  13
+2022-09-08  20:18:16.530  [Thread-2] DEBUG mao.t1.Test:  12
+2022-09-08  20:18:16.530  [Thread-1] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@5a56cdac
+2022-09-08  20:18:16.530  [Thread-2] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@7c711375
+2022-09-08  20:18:16.546  [Thread-0] DEBUG mao.t1.Test:  14
+2022-09-08  20:18:16.546  [Thread-0] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@57cf54e1
+2022-09-08  20:18:18.533  [Thread-1] DEBUG mao.t1.Test:  15
+2022-09-08  20:18:18.533  [Thread-2] DEBUG mao.t1.Test:  16
+2022-09-08  20:18:18.533  [Thread-1] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@5b03b9fe
+2022-09-08  20:18:18.533  [Thread-2] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@37d4349f
+2022-09-08  20:18:18.549  [Thread-0] DEBUG mao.t1.Test:  17
+2022-09-08  20:18:20.540  [Thread-2] DEBUG mao.t1.Test:  19
+2022-09-08  20:18:20.540  [Thread-1] DEBUG mao.t1.Test:  18
+2022-09-08  20:18:21.559  [Thread-0] DEBUG mao.t1.ThreadPool:  worker 被移除Thread[Thread-0,5,main]
+2022-09-08  20:18:23.543  [Thread-1] DEBUG mao.t1.ThreadPool:  worker 被移除Thread[Thread-1,5,main]
+2022-09-08  20:18:23.543  [Thread-2] DEBUG mao.t1.ThreadPool:  worker 被移除Thread[Thread-2,5,main]
+```
+
+
+
+
+
+更改拒绝策略为超时失败
+
+```java
+package mao.t1;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.TimeUnit;
+
+/**
+ * Project name(项目名称)：java并发编程_自定义线程池
+ * Package(包名): mao.t1
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/8
+ * Time(创建时间)： 14:38
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args)
+    {
+        ThreadPool threadPool = new ThreadPool(3, 3, TimeUnit.SECONDS, 5, new RejectPolicy<Runnable>()
+        {
+            @Override
+            public void reject(BlockingQueue<Runnable> queue, Runnable task)
+            {
+                boolean b = queue.offer(task, 1, TimeUnit.SECONDS);
+                if (!b)
+                {
+                    log.warn("任务" + task + "添加失败");
+                }
+            }
+        });
+
+        for (int i = 0; i < 20; i++)
+        {
+            int finalI = i;
+            threadPool.execute(new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    try
+                    {
+                        Thread.sleep(2000);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                    log.debug("" + finalI);
+                }
+            });
+        }
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-08  20:25:22.642  [main] DEBUG mao.t1.ThreadPool:  task加入到队列 workers  task:mao.t1.Test$2@56cdfb3b    worker:Thread[Thread-0,5,main]
+2022-09-08  20:25:22.645  [main] DEBUG mao.t1.ThreadPool:  task加入到队列 workers  task:mao.t1.Test$2@306e95ec    worker:Thread[Thread-1,5,main]
+2022-09-08  20:25:22.645  [main] DEBUG mao.t1.ThreadPool:  task加入到队列 workers  task:mao.t1.Test$2@6fd83fc1    worker:Thread[Thread-2,5,main]
+2022-09-08  20:25:22.645  [Thread-0] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@56cdfb3b
+2022-09-08  20:25:22.645  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@bae7dc0
+2022-09-08  20:25:22.645  [Thread-2] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@6fd83fc1
+2022-09-08  20:25:22.645  [Thread-1] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@306e95ec
+2022-09-08  20:25:22.645  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@209da20d
+2022-09-08  20:25:22.645  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@e15b7e8
+2022-09-08  20:25:22.645  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@1b2abca6
+2022-09-08  20:25:22.646  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@6392827e
+2022-09-08  20:25:22.646  [main] DEBUG mao.t1.BlockingQueue:  等待加入任务队列：mao.t1.Test$2@2ed2d9cb
+2022-09-08  20:25:23.646  [main] WARN  mao.t1.Test:  任务mao.t1.Test$2@2ed2d9cb添加失败
+2022-09-08  20:25:23.646  [main] DEBUG mao.t1.BlockingQueue:  等待加入任务队列：mao.t1.Test$2@c88a337
+2022-09-08  20:25:24.657  [main] WARN  mao.t1.Test:  任务mao.t1.Test$2@c88a337添加失败
+2022-09-08  20:25:24.657  [Thread-2] DEBUG mao.t1.Test:  2
+2022-09-08  20:25:24.657  [Thread-0] DEBUG mao.t1.Test:  0
+2022-09-08  20:25:24.657  [main] DEBUG mao.t1.BlockingQueue:  等待加入任务队列：mao.t1.Test$2@5d0a1059
+2022-09-08  20:25:24.657  [Thread-1] DEBUG mao.t1.Test:  1
+2022-09-08  20:25:24.657  [Thread-2] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@bae7dc0
+2022-09-08  20:25:24.657  [Thread-1] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@209da20d
+2022-09-08  20:25:24.657  [Thread-0] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@e15b7e8
+2022-09-08  20:25:24.658  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@5d0a1059
+2022-09-08  20:25:24.658  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@485966cc
+2022-09-08  20:25:24.658  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@1de76cc7
+2022-09-08  20:25:24.658  [main] DEBUG mao.t1.BlockingQueue:  等待加入任务队列：mao.t1.Test$2@54bff557
+2022-09-08  20:25:25.670  [main] WARN  mao.t1.Test:  任务mao.t1.Test$2@54bff557添加失败
+2022-09-08  20:25:25.670  [main] DEBUG mao.t1.BlockingQueue:  等待加入任务队列：mao.t1.Test$2@593aaf41
+2022-09-08  20:25:26.672  [main] WARN  mao.t1.Test:  任务mao.t1.Test$2@593aaf41添加失败
+2022-09-08  20:25:26.672  [Thread-2] DEBUG mao.t1.Test:  3
+2022-09-08  20:25:26.672  [Thread-1] DEBUG mao.t1.Test:  4
+2022-09-08  20:25:26.672  [Thread-0] DEBUG mao.t1.Test:  5
+2022-09-08  20:25:26.672  [main] DEBUG mao.t1.BlockingQueue:  等待加入任务队列：mao.t1.Test$2@5a56cdac
+2022-09-08  20:25:26.672  [Thread-1] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@1b2abca6
+2022-09-08  20:25:26.672  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@5a56cdac
+2022-09-08  20:25:26.672  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@7c711375
+2022-09-08  20:25:26.672  [Thread-0] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@5d0a1059
+2022-09-08  20:25:26.672  [Thread-2] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@6392827e
+2022-09-08  20:25:26.673  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@57cf54e1
+2022-09-08  20:25:26.673  [main] DEBUG mao.t1.BlockingQueue:  等待加入任务队列：mao.t1.Test$2@5b03b9fe
+2022-09-08  20:25:27.677  [main] WARN  mao.t1.Test:  任务mao.t1.Test$2@5b03b9fe添加失败
+2022-09-08  20:25:27.677  [main] DEBUG mao.t1.BlockingQueue:  等待加入任务队列：mao.t1.Test$2@37d4349f
+2022-09-08  20:25:28.675  [Thread-1] DEBUG mao.t1.Test:  6
+2022-09-08  20:25:28.675  [Thread-1] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@485966cc
+2022-09-08  20:25:28.675  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@37d4349f
+2022-09-08  20:25:28.687  [Thread-2] DEBUG mao.t1.Test:  7
+2022-09-08  20:25:28.687  [Thread-0] DEBUG mao.t1.Test:  10
+2022-09-08  20:25:28.687  [Thread-2] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@1de76cc7
+2022-09-08  20:25:28.687  [Thread-0] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@5a56cdac
+2022-09-08  20:25:30.679  [Thread-1] DEBUG mao.t1.Test:  11
+2022-09-08  20:25:30.679  [Thread-1] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@7c711375
+2022-09-08  20:25:30.694  [Thread-2] DEBUG mao.t1.Test:  12
+2022-09-08  20:25:30.694  [Thread-0] DEBUG mao.t1.Test:  15
+2022-09-08  20:25:30.694  [Thread-2] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@57cf54e1
+2022-09-08  20:25:30.694  [Thread-0] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@37d4349f
+2022-09-08  20:25:32.687  [Thread-1] DEBUG mao.t1.Test:  16
+2022-09-08  20:25:32.703  [Thread-0] DEBUG mao.t1.Test:  19
+2022-09-08  20:25:32.703  [Thread-2] DEBUG mao.t1.Test:  17
+2022-09-08  20:25:35.689  [Thread-1] DEBUG mao.t1.ThreadPool:  worker 被移除Thread[Thread-1,5,main]
+2022-09-08  20:25:35.706  [Thread-0] DEBUG mao.t1.ThreadPool:  worker 被移除Thread[Thread-0,5,main]
+2022-09-08  20:25:35.706  [Thread-2] DEBUG mao.t1.ThreadPool:  worker 被移除Thread[Thread-2,5,main]
+```
+
+
+
+
+
+更改拒绝策略为直接丢弃
+
+```java
+package mao.t1;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.TimeUnit;
+
+/**
+ * Project name(项目名称)：java并发编程_自定义线程池
+ * Package(包名): mao.t1
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/8
+ * Time(创建时间)： 14:38
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args)
+    {
+        ThreadPool threadPool = new ThreadPool(3, 3, TimeUnit.SECONDS, 10, new RejectPolicy<Runnable>()
+        {
+            @Override
+            public void reject(BlockingQueue<Runnable> queue, Runnable task)
+            {
+                //queue.put(task);
+
+                /*boolean b = queue.offer(task, 1, TimeUnit.SECONDS);
+                if (!b)
+                {
+                    log.warn("任务" + task + "添加失败");
+                }*/
+
+                log.warn("丢弃任务：" + task);
+            }
+        });
+
+        for (int i = 0; i < 20; i++)
+        {
+            int finalI = i;
+            threadPool.execute(new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    try
+                    {
+                        Thread.sleep(2000);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                    log.debug("" + finalI);
+                }
+            });
+        }
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-08  20:28:12.655  [main] DEBUG mao.t1.ThreadPool:  task加入到队列 workers  task:mao.t1.Test$2@56cdfb3b    worker:Thread[Thread-0,5,main]
+2022-09-08  20:28:12.657  [main] DEBUG mao.t1.ThreadPool:  task加入到队列 workers  task:mao.t1.Test$2@306e95ec    worker:Thread[Thread-1,5,main]
+2022-09-08  20:28:12.657  [main] DEBUG mao.t1.ThreadPool:  task加入到队列 workers  task:mao.t1.Test$2@6fd83fc1    worker:Thread[Thread-2,5,main]
+2022-09-08  20:28:12.657  [Thread-0] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@56cdfb3b
+2022-09-08  20:28:12.657  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@bae7dc0
+2022-09-08  20:28:12.657  [Thread-1] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@306e95ec
+2022-09-08  20:28:12.657  [Thread-2] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@6fd83fc1
+2022-09-08  20:28:12.657  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@209da20d
+2022-09-08  20:28:12.657  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@e15b7e8
+2022-09-08  20:28:12.658  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@1b2abca6
+2022-09-08  20:28:12.658  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@6392827e
+2022-09-08  20:28:12.658  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@2ed2d9cb
+2022-09-08  20:28:12.658  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@d5b810e
+2022-09-08  20:28:12.658  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@43dac38f
+2022-09-08  20:28:12.658  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@342c38f8
+2022-09-08  20:28:12.658  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@c88a337
+2022-09-08  20:28:12.658  [main] WARN  mao.t1.Test:  丢弃任务：mao.t1.Test$2@5d0a1059
+2022-09-08  20:28:12.658  [main] WARN  mao.t1.Test:  丢弃任务：mao.t1.Test$2@485966cc
+2022-09-08  20:28:12.658  [main] WARN  mao.t1.Test:  丢弃任务：mao.t1.Test$2@1de76cc7
+2022-09-08  20:28:12.658  [main] WARN  mao.t1.Test:  丢弃任务：mao.t1.Test$2@54bff557
+2022-09-08  20:28:12.658  [main] WARN  mao.t1.Test:  丢弃任务：mao.t1.Test$2@593aaf41
+2022-09-08  20:28:12.658  [main] WARN  mao.t1.Test:  丢弃任务：mao.t1.Test$2@5a56cdac
+2022-09-08  20:28:12.658  [main] WARN  mao.t1.Test:  丢弃任务：mao.t1.Test$2@7c711375
+2022-09-08  20:28:14.657  [Thread-1] DEBUG mao.t1.Test:  1
+2022-09-08  20:28:14.658  [Thread-1] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@bae7dc0
+2022-09-08  20:28:14.659  [Thread-0] DEBUG mao.t1.Test:  0
+2022-09-08  20:28:14.659  [Thread-2] DEBUG mao.t1.Test:  2
+2022-09-08  20:28:14.659  [Thread-0] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@209da20d
+2022-09-08  20:28:14.659  [Thread-2] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@e15b7e8
+2022-09-08  20:28:16.670  [Thread-0] DEBUG mao.t1.Test:  4
+2022-09-08  20:28:16.670  [Thread-1] DEBUG mao.t1.Test:  3
+2022-09-08  20:28:16.670  [Thread-2] DEBUG mao.t1.Test:  5
+2022-09-08  20:28:16.670  [Thread-0] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@1b2abca6
+2022-09-08  20:28:16.670  [Thread-1] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@6392827e
+2022-09-08  20:28:16.670  [Thread-2] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@2ed2d9cb
+2022-09-08  20:28:18.681  [Thread-1] DEBUG mao.t1.Test:  7
+2022-09-08  20:28:18.681  [Thread-0] DEBUG mao.t1.Test:  6
+2022-09-08  20:28:18.681  [Thread-2] DEBUG mao.t1.Test:  8
+2022-09-08  20:28:18.681  [Thread-1] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@d5b810e
+2022-09-08  20:28:18.681  [Thread-0] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@43dac38f
+2022-09-08  20:28:18.681  [Thread-2] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@342c38f8
+2022-09-08  20:28:20.683  [Thread-2] DEBUG mao.t1.Test:  11
+2022-09-08  20:28:20.683  [Thread-0] DEBUG mao.t1.Test:  10
+2022-09-08  20:28:20.683  [Thread-1] DEBUG mao.t1.Test:  9
+2022-09-08  20:28:20.683  [Thread-2] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@c88a337
+2022-09-08  20:28:22.691  [Thread-2] DEBUG mao.t1.Test:  12
+2022-09-08  20:28:23.690  [Thread-0] DEBUG mao.t1.ThreadPool:  worker 被移除Thread[Thread-0,5,main]
+2022-09-08  20:28:23.690  [Thread-1] DEBUG mao.t1.ThreadPool:  worker 被移除Thread[Thread-1,5,main]
+2022-09-08  20:28:25.706  [Thread-2] DEBUG mao.t1.ThreadPool:  worker 被移除Thread[Thread-2,5,main]
+```
+
+
+
+更改拒绝策略为抛出异常
+
+```java
+package mao.t1;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.TimeUnit;
+
+/**
+ * Project name(项目名称)：java并发编程_自定义线程池
+ * Package(包名): mao.t1
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/8
+ * Time(创建时间)： 14:38
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args)
+    {
+        ThreadPool threadPool = new ThreadPool(3, 3, TimeUnit.SECONDS, 10, new RejectPolicy<Runnable>()
+        {
+            @Override
+            public void reject(BlockingQueue<Runnable> queue, Runnable task)
+            {
+                //queue.put(task);
+
+                /*boolean b = queue.offer(task, 1, TimeUnit.SECONDS);
+                if (!b)
+                {
+                    log.warn("任务" + task + "添加失败");
+                }*/
+
+                //log.warn("丢弃任务：" + task);
+
+                throw new RuntimeException("线程池任务队列已满！task:" + task + "已被丢弃");
+            }
+        });
+
+        for (int i = 0; i < 20; i++)
+        {
+            int finalI = i;
+            try
+            {
+                threadPool.execute(new Runnable()
+                {
+                    @Override
+                    public void run()
+                    {
+                        try
+                        {
+                            Thread.sleep(2000);
+                        }
+                        catch (InterruptedException e)
+                        {
+                            e.printStackTrace();
+                        }
+                        log.debug("" + finalI);
+                    }
+                });
+            }
+            catch (RuntimeException e)
+            {
+                //处理异常
+                e.printStackTrace();
+            }
+        }
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-08  20:33:09.977  [main] DEBUG mao.t1.ThreadPool:  task加入到队列 workers  task:mao.t1.Test$2@56cdfb3b    worker:Thread[Thread-0,5,main]
+2022-09-08  20:33:09.979  [main] DEBUG mao.t1.ThreadPool:  task加入到队列 workers  task:mao.t1.Test$2@306e95ec    worker:Thread[Thread-1,5,main]
+2022-09-08  20:33:09.979  [main] DEBUG mao.t1.ThreadPool:  task加入到队列 workers  task:mao.t1.Test$2@6fd83fc1    worker:Thread[Thread-2,5,main]
+2022-09-08  20:33:09.979  [Thread-0] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@56cdfb3b
+2022-09-08  20:33:09.979  [Thread-1] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@306e95ec
+2022-09-08  20:33:09.979  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@bae7dc0
+2022-09-08  20:33:09.980  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@209da20d
+2022-09-08  20:33:09.980  [Thread-2] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@6fd83fc1
+2022-09-08  20:33:09.980  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@e15b7e8
+2022-09-08  20:33:09.980  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@1b2abca6
+2022-09-08  20:33:09.980  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@6392827e
+2022-09-08  20:33:09.980  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@2ed2d9cb
+2022-09-08  20:33:09.980  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@d5b810e
+2022-09-08  20:33:09.980  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@43dac38f
+2022-09-08  20:33:09.980  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@342c38f8
+2022-09-08  20:33:09.980  [main] DEBUG mao.t1.BlockingQueue:  加入任务队列：mao.t1.Test$2@c88a337
+java.lang.RuntimeException: 线程池任务队列已满！task:mao.t1.Test$2@5d0a1059已被丢弃
+	at mao.t1.Test$1.reject(Test.java:42)
+	at mao.t1.Test$1.reject(Test.java:28)
+	at mao.t1.BlockingQueue.tryPut(BlockingQueue.java:250)
+	at mao.t1.ThreadPool.execute(ThreadPool.java:110)
+	at mao.t1.Test.main(Test.java:51)
+java.lang.RuntimeException: 线程池任务队列已满！task:mao.t1.Test$2@593aaf41已被丢弃
+	at mao.t1.Test$1.reject(Test.java:42)
+	at mao.t1.Test$1.reject(Test.java:28)
+	at mao.t1.BlockingQueue.tryPut(BlockingQueue.java:250)
+	at mao.t1.ThreadPool.execute(ThreadPool.java:110)
+	at mao.t1.Test.main(Test.java:51)
+java.lang.RuntimeException: 线程池任务队列已满！task:mao.t1.Test$2@7c711375已被丢弃
+	at mao.t1.Test$1.reject(Test.java:42)
+	at mao.t1.Test$1.reject(Test.java:28)
+	at mao.t1.BlockingQueue.tryPut(BlockingQueue.java:250)
+	at mao.t1.ThreadPool.execute(ThreadPool.java:110)
+	at mao.t1.Test.main(Test.java:51)
+java.lang.RuntimeException: 线程池任务队列已满！task:mao.t1.Test$2@5b03b9fe已被丢弃
+	at mao.t1.Test$1.reject(Test.java:42)
+	at mao.t1.Test$1.reject(Test.java:28)
+	at mao.t1.BlockingQueue.tryPut(BlockingQueue.java:250)
+	at mao.t1.ThreadPool.execute(ThreadPool.java:110)
+	at mao.t1.Test.main(Test.java:51)
+java.lang.RuntimeException: 线程池任务队列已满！task:mao.t1.Test$2@434a63ab已被丢弃
+	at mao.t1.Test$1.reject(Test.java:42)
+	at mao.t1.Test$1.reject(Test.java:28)
+	at mao.t1.BlockingQueue.tryPut(BlockingQueue.java:250)
+	at mao.t1.ThreadPool.execute(ThreadPool.java:110)
+	at mao.t1.Test.main(Test.java:51)
+java.lang.RuntimeException: 线程池任务队列已满！task:mao.t1.Test$2@2805d709已被丢弃
+	at mao.t1.Test$1.reject(Test.java:42)
+	at mao.t1.Test$1.reject(Test.java:28)
+	at mao.t1.BlockingQueue.tryPut(BlockingQueue.java:250)
+	at mao.t1.ThreadPool.execute(ThreadPool.java:110)
+	at mao.t1.Test.main(Test.java:51)
+java.lang.RuntimeException: 线程池任务队列已满！task:mao.t1.Test$2@2ea41516已被丢弃
+	at mao.t1.Test$1.reject(Test.java:42)
+	at mao.t1.Test$1.reject(Test.java:28)
+	at mao.t1.BlockingQueue.tryPut(BlockingQueue.java:250)
+	at mao.t1.ThreadPool.execute(ThreadPool.java:110)
+	at mao.t1.Test.main(Test.java:51)
+2022-09-08  20:33:11.988  [Thread-1] DEBUG mao.t1.Test:  1
+2022-09-08  20:33:11.988  [Thread-0] DEBUG mao.t1.Test:  0
+2022-09-08  20:33:11.988  [Thread-1] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@bae7dc0
+2022-09-08  20:33:11.988  [Thread-2] DEBUG mao.t1.Test:  2
+2022-09-08  20:33:11.988  [Thread-0] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@209da20d
+2022-09-08  20:33:11.989  [Thread-2] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@e15b7e8
+2022-09-08  20:33:13.991  [Thread-2] DEBUG mao.t1.Test:  5
+2022-09-08  20:33:13.991  [Thread-0] DEBUG mao.t1.Test:  4
+2022-09-08  20:33:13.991  [Thread-1] DEBUG mao.t1.Test:  3
+2022-09-08  20:33:13.991  [Thread-2] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@1b2abca6
+2022-09-08  20:33:13.991  [Thread-0] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@6392827e
+2022-09-08  20:33:13.991  [Thread-1] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@2ed2d9cb
+2022-09-08  20:33:15.998  [Thread-1] DEBUG mao.t1.Test:  8
+2022-09-08  20:33:15.998  [Thread-0] DEBUG mao.t1.Test:  7
+2022-09-08  20:33:15.998  [Thread-2] DEBUG mao.t1.Test:  6
+2022-09-08  20:33:15.998  [Thread-1] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@d5b810e
+2022-09-08  20:33:15.998  [Thread-2] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@43dac38f
+2022-09-08  20:33:15.998  [Thread-0] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@342c38f8
+2022-09-08  20:33:18.007  [Thread-1] DEBUG mao.t1.Test:  9
+2022-09-08  20:33:18.007  [Thread-0] DEBUG mao.t1.Test:  11
+2022-09-08  20:33:18.007  [Thread-2] DEBUG mao.t1.Test:  10
+2022-09-08  20:33:18.007  [Thread-1] DEBUG mao.t1.ThreadPool:  正在执行任务：mao.t1.Test$2@c88a337
+2022-09-08  20:33:20.021  [Thread-1] DEBUG mao.t1.Test:  12
+2022-09-08  20:33:21.011  [Thread-2] DEBUG mao.t1.ThreadPool:  worker 被移除Thread[Thread-2,5,main]
+2022-09-08  20:33:21.011  [Thread-0] DEBUG mao.t1.ThreadPool:  worker 被移除Thread[Thread-0,5,main]
+2022-09-08  20:33:23.026  [Thread-1] DEBUG mao.t1.ThreadPool:  worker 被移除Thread[Thread-1,5,main]
+```
+
+
+
+
+
