@@ -14980,3 +14980,363 @@ name：张三
 
 # 共享模型之不可变
 
+## 日期转换的问题
+
+SimpleDateFormat 不是线程安全的
+
+
+
+```java
+package mao.t1;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.text.SimpleDateFormat;
+
+/**
+ * Project name(项目名称)：java并发编程_不可变
+ * Package(包名): mao.t1
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/8
+ * Time(创建时间)： 12:56
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args)
+    {
+        SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd");
+        for (int i = 0; i < 20; i++)
+        {
+            new Thread(() ->
+            {
+                try
+                {
+                    log.debug(simpleDateFormat.parse("2022-07-30").toString());
+                }
+                catch (Exception e)
+                {
+                    e.printStackTrace();
+                }
+            }).start();
+        }
+
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+java.lang.NumberFormatException: For input string: ""
+	at java.base/java.lang.NumberFormatException.forInputString(NumberFormatException.java:67)
+	at java.base/java.lang.Long.parseLong(Long.java:724)
+	at java.base/java.lang.Long.parseLong(Long.java:839)
+	at java.base/java.text.DigitList.getLong(DigitList.java:195)
+	at java.base/java.text.DecimalFormat.parse(DecimalFormat.java:2197)
+	at java.base/java.text.SimpleDateFormat.subParse(SimpleDateFormat.java:1934)
+	at java.base/java.text.SimpleDateFormat.parse(SimpleDateFormat.java:1542)
+	at java.base/java.text.DateFormat.parse(DateFormat.java:394)
+	at mao.t1.Test.lambda$main$0(Test.java:34)
+	at java.base/java.lang.Thread.run(Thread.java:831)
+java.lang.NumberFormatException: For input string: ".330E"
+	at java.base/java.lang.NumberFormatException.forInputString(NumberFormatException.java:67)
+	at java.base/java.lang.Long.parseLong(Long.java:700)
+	at java.base/java.lang.Long.parseLong(Long.java:839)
+	at java.base/java.text.DigitList.getLong(DigitList.java:195)
+	at java.base/java.text.DecimalFormat.parse(DecimalFormat.java:2197)
+	at java.base/java.text.SimpleDateFormat.subParse(SimpleDateFormat.java:2241)
+	at java.base/java.text.SimpleDateFormat.parse(SimpleDateFormat.java:1542)
+	at java.base/java.text.DateFormat.parse(DateFormat.java:394)
+	at mao.t1.Test.lambda$main$0(Test.java:34)
+	at java.base/java.lang.Thread.run(Thread.java:831)
+java.lang.NumberFormatException: For input string: ""
+	at java.base/java.lang.NumberFormatException.forInputString(NumberFormatException.java:67)
+	at java.base/java.lang.Long.parseLong(Long.java:724)
+	at java.base/java.lang.Long.parseLong(Long.java:839)
+	at java.base/java.text.DigitList.getLong(DigitList.java:195)
+	at java.base/java.text.DecimalFormat.parse(DecimalFormat.java:2197)
+	at java.base/java.text.SimpleDateFormat.subParse(SimpleDateFormat.java:1934)
+	at java.base/java.text.SimpleDateFormat.parse(SimpleDateFormat.java:1542)
+	at java.base/java.text.DateFormat.parse(DateFormat.java:394)
+	at mao.t1.Test.lambda$main$0(Test.java:34)
+	at java.base/java.lang.Thread.run(Thread.java:831)
+2022-09-08  13:02:37.265  [Thread-17] DEBUG mao.t1.Test:  Sat Jul 30 00:00:00 CST 2022
+2022-09-08  13:02:37.265  [Thread-18] DEBUG mao.t1.Test:  Sat Jul 30 00:00:00 CST 2022
+2022-09-08  13:02:37.265  [Thread-5] DEBUG mao.t1.Test:  Sat Jul 30 00:00:00 CST 2022
+2022-09-08  13:02:37.265  [Thread-16] DEBUG mao.t1.Test:  Sat Jul 30 00:00:00 CST 2022
+2022-09-08  13:02:37.265  [Thread-13] DEBUG mao.t1.Test:  Wed Jul 30 00:00:00 CST 77
+2022-09-08  13:02:37.265  [Thread-8] DEBUG mao.t1.Test:  Thu Jun 30 00:00:00 CST 2022
+2022-09-08  13:02:37.265  [Thread-10] DEBUG mao.t1.Test:  Tue Aug 02 00:00:00 CST 2022
+2022-09-08  13:02:37.265  [Thread-6] DEBUG mao.t1.Test:  Sat Jul 30 00:00:00 CST 2022
+2022-09-08  13:02:37.265  [Thread-14] DEBUG mao.t1.Test:  Wed Jul 30 00:00:00 CST 77
+2022-09-08  13:02:37.265  [Thread-7] DEBUG mao.t1.Test:  Sat Jul 30 00:00:00 CST 2022
+2022-09-08  13:02:37.265  [Thread-4] DEBUG mao.t1.Test:  Sun Jul 30 00:00:00 CST 2220
+2022-09-08  13:02:37.265  [Thread-12] DEBUG mao.t1.Test:  Tue May 30 00:00:00 CST 2028
+2022-09-08  13:02:37.265  [Thread-0] DEBUG mao.t1.Test:  Thu Jun 30 00:00:00 CST 2472
+2022-09-08  13:02:37.265  [Thread-2] DEBUG mao.t1.Test:  Sun Jul 30 00:00:00 CST 2220
+2022-09-08  13:02:37.265  [Thread-11] DEBUG mao.t1.Test:  Wed Jul 30 00:00:00 CST 77
+2022-09-08  13:02:37.265  [Thread-19] DEBUG mao.t1.Test:  Sat Jul 30 00:00:00 CST 2022
+2022-09-08  13:02:37.265  [Thread-3] DEBUG mao.t1.Test:  Sun Jul 30 00:00:00 CST 2220
+```
+
+
+
+有很大几率出现 java.lang.NumberFormatException 或者出现不正确的日期解析结果
+
+
+
+可以使用同步锁，这样虽能解决问题，但带来的是性能上的损失，并不算很好
+
+
+
+```java
+package mao.t2;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.text.SimpleDateFormat;
+
+/**
+ * Project name(项目名称)：java并发编程_不可变
+ * Package(包名): mao.t2
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/8
+ * Time(创建时间)： 13:04
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args)
+    {
+        SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd");
+
+        for (int i = 0; i < 20; i++)
+        {
+            new Thread(() ->
+            {
+                synchronized (simpleDateFormat)
+                {
+                    try
+                    {
+                        log.debug(simpleDateFormat.parse("2022-07-30").toString());
+                    }
+                    catch (Exception e)
+                    {
+                        e.printStackTrace();
+                    }
+                }
+            }).start();
+        }
+
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-08  13:05:16.804  [Thread-0] DEBUG mao.t2.Test:  Sat Jul 30 00:00:00 CST 2022
+2022-09-08  13:05:16.806  [Thread-19] DEBUG mao.t2.Test:  Sat Jul 30 00:00:00 CST 2022
+2022-09-08  13:05:16.806  [Thread-18] DEBUG mao.t2.Test:  Sat Jul 30 00:00:00 CST 2022
+2022-09-08  13:05:16.807  [Thread-17] DEBUG mao.t2.Test:  Sat Jul 30 00:00:00 CST 2022
+2022-09-08  13:05:16.807  [Thread-16] DEBUG mao.t2.Test:  Sat Jul 30 00:00:00 CST 2022
+2022-09-08  13:05:16.808  [Thread-15] DEBUG mao.t2.Test:  Sat Jul 30 00:00:00 CST 2022
+2022-09-08  13:05:16.808  [Thread-14] DEBUG mao.t2.Test:  Sat Jul 30 00:00:00 CST 2022
+2022-09-08  13:05:16.808  [Thread-13] DEBUG mao.t2.Test:  Sat Jul 30 00:00:00 CST 2022
+2022-09-08  13:05:16.808  [Thread-12] DEBUG mao.t2.Test:  Sat Jul 30 00:00:00 CST 2022
+2022-09-08  13:05:16.809  [Thread-11] DEBUG mao.t2.Test:  Sat Jul 30 00:00:00 CST 2022
+2022-09-08  13:05:16.809  [Thread-10] DEBUG mao.t2.Test:  Sat Jul 30 00:00:00 CST 2022
+2022-09-08  13:05:16.809  [Thread-9] DEBUG mao.t2.Test:  Sat Jul 30 00:00:00 CST 2022
+2022-09-08  13:05:16.809  [Thread-8] DEBUG mao.t2.Test:  Sat Jul 30 00:00:00 CST 2022
+2022-09-08  13:05:16.810  [Thread-7] DEBUG mao.t2.Test:  Sat Jul 30 00:00:00 CST 2022
+2022-09-08  13:05:16.810  [Thread-6] DEBUG mao.t2.Test:  Sat Jul 30 00:00:00 CST 2022
+2022-09-08  13:05:16.810  [Thread-5] DEBUG mao.t2.Test:  Sat Jul 30 00:00:00 CST 2022
+2022-09-08  13:05:16.810  [Thread-4] DEBUG mao.t2.Test:  Sat Jul 30 00:00:00 CST 2022
+2022-09-08  13:05:16.811  [Thread-3] DEBUG mao.t2.Test:  Sat Jul 30 00:00:00 CST 2022
+2022-09-08  13:05:16.811  [Thread-2] DEBUG mao.t2.Test:  Sat Jul 30 00:00:00 CST 2022
+2022-09-08  13:05:16.811  [Thread-1] DEBUG mao.t2.Test:  Sat Jul 30 00:00:00 CST 2022
+```
+
+
+
+
+
+不可变设计
+
+在 Java 8 后，提供了一个新的日期格式化类
+
+
+
+```java
+package mao.t3;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.text.SimpleDateFormat;
+import java.time.format.DateTimeFormatter;
+
+/**
+ * Project name(项目名称)：java并发编程_不可变
+ * Package(包名): mao.t3
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/8
+ * Time(创建时间)： 13:07
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args)
+    {
+        DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        for (int i = 0; i < 20; i++)
+        {
+            new Thread(() ->
+            {
+                try
+                {
+                    log.debug(dateTimeFormatter.parse("2022-07-30").toString());
+                }
+                catch (Exception e)
+                {
+                    e.printStackTrace();
+                }
+            }).start();
+        }
+
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-08  13:10:00.812  [Thread-9] DEBUG mao.t3.Test:  {},ISO resolved to 2022-07-30
+2022-09-08  13:10:00.812  [Thread-1] DEBUG mao.t3.Test:  {},ISO resolved to 2022-07-30
+2022-09-08  13:10:00.812  [Thread-3] DEBUG mao.t3.Test:  {},ISO resolved to 2022-07-30
+2022-09-08  13:10:00.812  [Thread-19] DEBUG mao.t3.Test:  {},ISO resolved to 2022-07-30
+2022-09-08  13:10:00.812  [Thread-18] DEBUG mao.t3.Test:  {},ISO resolved to 2022-07-30
+2022-09-08  13:10:00.812  [Thread-16] DEBUG mao.t3.Test:  {},ISO resolved to 2022-07-30
+2022-09-08  13:10:00.812  [Thread-13] DEBUG mao.t3.Test:  {},ISO resolved to 2022-07-30
+2022-09-08  13:10:00.812  [Thread-8] DEBUG mao.t3.Test:  {},ISO resolved to 2022-07-30
+2022-09-08  13:10:00.812  [Thread-12] DEBUG mao.t3.Test:  {},ISO resolved to 2022-07-30
+2022-09-08  13:10:00.812  [Thread-15] DEBUG mao.t3.Test:  {},ISO resolved to 2022-07-30
+2022-09-08  13:10:00.812  [Thread-2] DEBUG mao.t3.Test:  {},ISO resolved to 2022-07-30
+2022-09-08  13:10:00.812  [Thread-11] DEBUG mao.t3.Test:  {},ISO resolved to 2022-07-30
+2022-09-08  13:10:00.812  [Thread-4] DEBUG mao.t3.Test:  {},ISO resolved to 2022-07-30
+2022-09-08  13:10:00.812  [Thread-14] DEBUG mao.t3.Test:  {},ISO resolved to 2022-07-30
+2022-09-08  13:10:00.812  [Thread-7] DEBUG mao.t3.Test:  {},ISO resolved to 2022-07-30
+2022-09-08  13:10:00.812  [Thread-6] DEBUG mao.t3.Test:  {},ISO resolved to 2022-07-30
+2022-09-08  13:10:00.812  [Thread-0] DEBUG mao.t3.Test:  {},ISO resolved to 2022-07-30
+2022-09-08  13:10:00.812  [Thread-10] DEBUG mao.t3.Test:  {},ISO resolved to 2022-07-30
+2022-09-08  13:10:00.812  [Thread-5] DEBUG mao.t3.Test:  {},ISO resolved to 2022-07-30
+2022-09-08  13:10:00.812  [Thread-17] DEBUG mao.t3.Test:  {},ISO resolved to 2022-07-30
+```
+
+
+
+
+
+## 不可变设计
+
+ String 类也是不可变的
+
+
+
+```java
+public final class String
+ implements java.io.Serializable, Comparable<String>, CharSequence {
+ /** The value is used for character storage. */
+ private final char value[];
+ /** Cache the hash code for the string */
+ private int hash; // Default to 0
+ 
+ // ...
+ 
+}
+```
+
+
+
+## 保护性拷贝
+
+```java
+public String substring(int beginIndex) {
+ if (beginIndex < 0) {
+ throw new StringIndexOutOfBoundsException(beginIndex);
+ }
+ int subLen = value.length - beginIndex;
+ if (subLen < 0) {
+ throw new StringIndexOutOfBoundsException(subLen);
+ }
+ return (beginIndex == 0) ? this : new String(value, beginIndex, subLen);
+}
+```
+
+
+
+发现其内部是调用 String 的构造方法创建了一个新字符串，再进入这个构造看看，是否对 final char[] value 做出了修改
+
+
+
+```java
+public String(char value[], int offset, int count) {
+ if (offset < 0) {
+ throw new StringIndexOutOfBoundsException(offset);
+ }
+ if (count <= 0) {
+ if (count < 0) {
+ throw new StringIndexOutOfBoundsException(count);
+ }
+ if (offset <= value.length) {
+ this.value = "".value;
+ return;
+ }
+ }
+ if (offset > value.length - count) {
+ throw new StringIndexOutOfBoundsException(offset + count);
+ }
+ this.value = Arrays.copyOfRange(value, offset, offset+count);
+}
+```
+
+
+
+结果发现也没有，构造新字符串对象时，会生成新的 char[] value，对内容进行复制 。这种通过创建副本对象来避 免共享的手段称之为**保护性拷贝**
+
+
+
+
+
+## 享元模式
+
