@@ -15340,3 +15340,155 @@ public String(char value[], int offset, int count) {
 
 ## 享元模式
 
+### 包装类
+
+在JDK中 Boolean，Byte，Short，Integer，Long，Character 等包装类提供了 valueOf 方法，例如 Long 的 valueOf 会缓存 -128~127 之间的 Long 对象，在这个范围之间会重用对象，大于这个范围，才会新建 Long 对 象
+
+```java
+public static Long valueOf(long l) {
+ final int offset = 128;
+ if (l >= -128 && l <= 127) { // will cache
+ return LongCache.cache[(int)l + offset];
+ }
+ return new Long(l);
+}
+```
+
+
+
+* Byte, Short, Long 缓存的范围都是 -128~127
+* Character 缓存的范围是 0~127
+* Integer的默认范围是 -128~127
+* Boolean 缓存了 TRUE 和 FALSE
+
+
+
+
+
+### 自定义简单连接池
+
+
+
+```java
+package mao.t1;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.sql.Connection;
+import java.util.concurrent.atomic.AtomicIntegerArray;
+
+/**
+ * Project name(项目名称)：java并发编程_享元模式
+ * Package(包名): mao.t1
+ * Class(类名): Pool
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/8
+ * Time(创建时间)： 13:25
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Pool
+{
+    /**
+     * 池大小
+     */
+    private final int poolSize;
+
+    /**
+     * 连接池
+     */
+    private final Connection[] connections;
+
+    private final AtomicIntegerArray states;
+
+    private static final Logger log = LoggerFactory.getLogger(Pool.class);
+
+    public Pool(int poolSize)
+    {
+        this.poolSize = poolSize;
+        this.connections = new Connection[poolSize];
+        this.states = new AtomicIntegerArray(new int[poolSize]);
+        for (int i = 0; i < poolSize; i++)
+        {
+            connections[i] = new MockConnection("连接" + (i + 1));
+        }
+    }
+
+    /**
+     * 借连接
+     *
+     * @return {@link Connection}
+     */
+    public Connection borrow()
+    {
+        while (true)
+        {
+            for (int i = 0; i < poolSize; i++)
+            {
+                // 获取空闲连接
+                if (states.get(i) == 0)
+                {
+                    if (states.compareAndSet(i, 0, 1))
+                    {
+                        log.debug("borrow {}", connections[i]);
+                        return connections[i];
+                    }
+                }
+            }
+            // 如果没有空闲连接，当前线程进入等待
+            synchronized (this)
+            {
+                try
+                {
+                    log.debug("wait...");
+                    this.wait();
+                }
+                catch (InterruptedException e)
+                {
+                    e.printStackTrace();
+                }
+            }
+        }
+
+
+    }
+
+    /**
+     * 归还连接
+     *
+     * @param conn Connection
+     */
+    public void free(Connection conn)
+    {
+        for (int i = 0; i < poolSize; i++)
+        {
+            if (connections[i] == conn)
+            {
+                states.set(i, 0);
+                synchronized (this)
+                {
+                    log.debug("free {}", conn);
+                    this.notifyAll();
+                }
+                break;
+            }
+        }
+    }
+
+
+
+}
+
+class MockConnection implements Connection {
+    // 实现略
+}
+```
+
+
+
+
+
