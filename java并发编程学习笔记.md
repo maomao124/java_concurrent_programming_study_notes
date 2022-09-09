@@ -20347,3 +20347,731 @@ public class Test
 
 ####  CPU 密集型运算
 
+通常采用 cpu 核数 + 1 能够实现最优的 CPU 利用率，+1 是保证当线程由于页缺失故障（操作系统）或其它原因 导致暂停时，额外的这个线程就能顶上去，保证 CPU 时钟周期不被浪费
+
+
+
+#### I/O 密集型运算
+
+CPU 不总是处于繁忙状态，例如，当你执行业务计算时，这时候会使用 CPU 资源，但当你执行 I/O 操作时、远程 RPC 调用时，包括进行数据库操作时，这时候 CPU 就闲下来了，你可以利用多线程提高它的利用率
+
+
+
+**公式如下：**
+
+**线程数 = 核数 * 期望 CPU 利用率 * 总时间(CPU计算时间+等待时间) / CPU 计算时间**
+
+
+
+例如 4 核 CPU 计算时间是 50% ，其它等待时间是 50%，期望 cpu 被 100% 利用，套用公式
+
+**4 * 100% * 100% / 50% = 8**
+
+例如 4 核 CPU 计算时间是 10% ，其它等待时间是 90%，期望 cpu 被 100% 利用，套用公式
+
+**4 * 100% * 100% / 10% = 40**
+
+
+
+
+
+
+
+### 任务调度线程池
+
+#### Timer
+
+可以使用 java.util.Timer 来实现定时功能，Timer 的优点在于简单易用，但 由于所有任务都是由同一个线程来调度，因此所有任务都是串行执行的，同一时间只能有一个任务在执行，前一个 任务的延迟或异常都将会影响到之后的任务
+
+
+
+```java
+package mao.t1;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.Timer;
+import java.util.TimerTask;
+
+/**
+ * Project name(项目名称)：java并发编程_任务调度线程池
+ * Package(包名): mao.t1
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/9
+ * Time(创建时间)： 17:18
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args)
+    {
+        Timer timer = new Timer();
+
+        TimerTask timerTask1 = new TimerTask()
+        {
+            @Override
+            public void run()
+            {
+                log.debug("timerTask1开始");
+                try
+                {
+                    Thread.sleep(1000);
+                }
+                catch (InterruptedException e)
+                {
+                    e.printStackTrace();
+                }
+                log.debug("timerTask1结束");
+            }
+        };
+
+        TimerTask timerTask2 = new TimerTask()
+        {
+            @Override
+            public void run()
+            {
+                log.debug("timerTask2开始");
+                try
+                {
+                    Thread.sleep(1000);
+                }
+                catch (InterruptedException e)
+                {
+                    e.printStackTrace();
+                }
+                log.debug("timerTask2结束");
+            }
+        };
+
+        timer.schedule(timerTask1,1000);
+        timer.schedule(timerTask2,1000);
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-09  17:21:34.799  [Timer-0] DEBUG mao.t1.Test:  timerTask1开始
+2022-09-09  17:21:35.813  [Timer-0] DEBUG mao.t1.Test:  timerTask1结束
+2022-09-09  17:21:35.813  [Timer-0] DEBUG mao.t1.Test:  timerTask2开始
+2022-09-09  17:21:36.827  [Timer-0] DEBUG mao.t1.Test:  timerTask2结束
+```
+
+
+
+
+
+#### ScheduledExecutorService
+
+使用 ScheduledExecutorService
+
+
+
+```java
+package mao.t2;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * Project name(项目名称)：java并发编程_任务调度线程池
+ * Package(包名): mao.t2
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/9
+ * Time(创建时间)： 17:23
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args)
+    {
+        log.debug("开始运行");
+        ScheduledExecutorService threadPool = Executors.newScheduledThreadPool(2);
+
+        for (int i = 0; i < 2; i++)
+        {
+            int finalI = i;
+            threadPool.schedule(new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    log.debug(finalI + "开始");
+                    try
+                    {
+                        Thread.sleep(1000);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                    log.debug(finalI + "结束");
+                }
+            }, 1, TimeUnit.SECONDS);
+        }
+
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-09  17:28:21.926  [main] DEBUG mao.t2.Test:  开始运行
+2022-09-09  17:28:22.939  [pool-2-thread-1] DEBUG mao.t2.Test:  0开始
+2022-09-09  17:28:22.939  [pool-2-thread-2] DEBUG mao.t2.Test:  1开始
+2022-09-09  17:28:23.952  [pool-2-thread-1] DEBUG mao.t2.Test:  0结束
+2022-09-09  17:28:23.952  [pool-2-thread-2] DEBUG mao.t2.Test:  1结束
+```
+
+
+
+任务数量更改为3
+
+```java
+package mao.t2;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * Project name(项目名称)：java并发编程_任务调度线程池
+ * Package(包名): mao.t2
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/9
+ * Time(创建时间)： 17:23
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args)
+    {
+        log.debug("开始运行");
+        ScheduledExecutorService threadPool = Executors.newScheduledThreadPool(2);
+
+        for (int i = 0; i < 3; i++)
+        {
+            int finalI = i;
+            threadPool.schedule(new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    log.debug(finalI + "开始");
+                    try
+                    {
+                        Thread.sleep(1000);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                    log.debug(finalI + "结束");
+                }
+            }, 1, TimeUnit.SECONDS);
+        }
+
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-09  17:29:07.307  [main] DEBUG mao.t2.Test:  开始运行
+2022-09-09  17:29:08.320  [pool-2-thread-1] DEBUG mao.t2.Test:  0开始
+2022-09-09  17:29:08.320  [pool-2-thread-2] DEBUG mao.t2.Test:  1开始
+2022-09-09  17:29:09.334  [pool-2-thread-2] DEBUG mao.t2.Test:  1结束
+2022-09-09  17:29:09.334  [pool-2-thread-1] DEBUG mao.t2.Test:  0结束
+2022-09-09  17:29:09.334  [pool-2-thread-2] DEBUG mao.t2.Test:  2开始
+2022-09-09  17:29:10.340  [pool-2-thread-2] DEBUG mao.t2.Test:  2结束
+```
+
+
+
+
+
+**scheduleAtFixedRate方法**
+
+
+
+```java
+package mao.t3;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * Project name(项目名称)：java并发编程_任务调度线程池
+ * Package(包名): mao.t3
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/9
+ * Time(创建时间)： 17:32
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args)
+    {
+        log.debug("开始运行");
+        ScheduledExecutorService threadPool = Executors.newScheduledThreadPool(2);
+
+        for (int i = 0; i < 2; i++)
+        {
+            int finalI = i;
+            //提交在给定初始延迟后首先启用的周期性操作，随后在给定周期内启用；
+            //也就是说，执行将在initialDelay之后开始，
+            //然后是initialDelay + period ，然后是initialDelay + 2 * period ，依此类推。
+            //任务执行的顺序无限期地继续，直到发生以下异常完成之一：
+            //该任务通过返回的未来显式取消。
+            //执行器终止，也导致任务取消。
+            //任务的执行会引发异常。在这种情况下，在返回的 future 上调用get将抛出ExecutionException ，并将异常作为其原因。
+            //随后的执行被禁止。在返回的未来上对isDone()的后续调用将返回true 。
+            //如果此任务的任何执行时间超过其周期，则后续执行可能会延迟开始，但不会同时执行
+            //参数：
+            //command - 要执行的任务
+            //initialDelay – 延迟首次执行的时间
+            //period – 连续执行之间的时间段
+            //unit – initialDelay 和 period 参数的时间单位
+            threadPool.scheduleAtFixedRate(new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    log.debug(finalI + "开始");
+                    try
+                    {
+                        Thread.sleep(1000);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                    log.debug(finalI + "结束");
+                }
+            }, 1, 2, TimeUnit.SECONDS);
+        }
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-09  17:35:12.231  [main] DEBUG mao.t3.Test:  开始运行
+2022-09-09  17:35:13.242  [pool-2-thread-2] DEBUG mao.t3.Test:  1开始
+2022-09-09  17:35:13.242  [pool-2-thread-1] DEBUG mao.t3.Test:  0开始
+2022-09-09  17:35:14.252  [pool-2-thread-1] DEBUG mao.t3.Test:  0结束
+2022-09-09  17:35:14.252  [pool-2-thread-2] DEBUG mao.t3.Test:  1结束
+2022-09-09  17:35:15.247  [pool-2-thread-2] DEBUG mao.t3.Test:  1开始
+2022-09-09  17:35:15.247  [pool-2-thread-1] DEBUG mao.t3.Test:  0开始
+2022-09-09  17:35:16.255  [pool-2-thread-2] DEBUG mao.t3.Test:  1结束
+2022-09-09  17:35:16.255  [pool-2-thread-1] DEBUG mao.t3.Test:  0结束
+2022-09-09  17:35:17.248  [pool-2-thread-1] DEBUG mao.t3.Test:  0开始
+2022-09-09  17:35:17.248  [pool-2-thread-2] DEBUG mao.t3.Test:  1开始
+2022-09-09  17:35:18.254  [pool-2-thread-1] DEBUG mao.t3.Test:  0结束
+2022-09-09  17:35:18.254  [pool-2-thread-2] DEBUG mao.t3.Test:  1结束
+2022-09-09  17:35:19.240  [pool-2-thread-2] DEBUG mao.t3.Test:  0开始
+2022-09-09  17:35:19.240  [pool-2-thread-1] DEBUG mao.t3.Test:  1开始
+2022-09-09  17:35:20.255  [pool-2-thread-2] DEBUG mao.t3.Test:  0结束
+2022-09-09  17:35:20.255  [pool-2-thread-1] DEBUG mao.t3.Test:  1结束
+2022-09-09  17:35:21.235  [pool-2-thread-1] DEBUG mao.t3.Test:  1开始
+2022-09-09  17:35:21.235  [pool-2-thread-2] DEBUG mao.t3.Test:  0开始
+2022-09-09  17:35:22.245  [pool-2-thread-2] DEBUG mao.t3.Test:  0结束
+2022-09-09  17:35:22.245  [pool-2-thread-1] DEBUG mao.t3.Test:  1结束
+2022-09-09  17:35:23.242  [pool-2-thread-1] DEBUG mao.t3.Test:  1开始
+2022-09-09  17:35:23.242  [pool-2-thread-2] DEBUG mao.t3.Test:  0开始
+2022-09-09  17:35:24.243  [pool-2-thread-1] DEBUG mao.t3.Test:  1结束
+2022-09-09  17:35:24.249  [pool-2-thread-2] DEBUG mao.t3.Test:  0结束
+2022-09-09  17:35:25.239  [pool-2-thread-1] DEBUG mao.t3.Test:  1开始
+2022-09-09  17:35:25.239  [pool-2-thread-2] DEBUG mao.t3.Test:  0开始
+2022-09-09  17:35:26.247  [pool-2-thread-1] DEBUG mao.t3.Test:  1结束
+2022-09-09  17:35:26.247  [pool-2-thread-2] DEBUG mao.t3.Test:  0结束
+2022-09-09  17:35:27.242  [pool-2-thread-1] DEBUG mao.t3.Test:  1开始
+2022-09-09  17:35:27.242  [pool-2-thread-2] DEBUG mao.t3.Test:  0开始
+```
+
+
+
+更改休眠时间，任务执行时间超过了间隔时间
+
+```java
+package mao.t3;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * Project name(项目名称)：java并发编程_任务调度线程池
+ * Package(包名): mao.t3
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/9
+ * Time(创建时间)： 17:32
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args)
+    {
+        log.debug("开始运行");
+        ScheduledExecutorService threadPool = Executors.newScheduledThreadPool(2);
+
+        for (int i = 0; i < 2; i++)
+        {
+            int finalI = i;
+            //提交在给定初始延迟后首先启用的周期性操作，随后在给定周期内启用；
+            //也就是说，执行将在initialDelay之后开始，
+            //然后是initialDelay + period ，然后是initialDelay + 2 * period ，依此类推。
+            //任务执行的顺序无限期地继续，直到发生以下异常完成之一：
+            //该任务通过返回的未来显式取消。
+            //执行器终止，也导致任务取消。
+            //任务的执行会引发异常。在这种情况下，在返回的 future 上调用get将抛出ExecutionException ，并将异常作为其原因。
+            //随后的执行被禁止。在返回的未来上对isDone()的后续调用将返回true 。
+            //如果此任务的任何执行时间超过其周期，则后续执行可能会延迟开始，但不会同时执行
+            //参数：
+            //command - 要执行的任务
+            //initialDelay – 延迟首次执行的时间
+            //period – 连续执行之间的时间段
+            //unit – initialDelay 和 period 参数的时间单位
+            threadPool.scheduleAtFixedRate(new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    log.debug(finalI + "开始");
+                    try
+                    {
+                        Thread.sleep(3000);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                    log.debug(finalI + "结束");
+                }
+            }, 1, 2, TimeUnit.SECONDS);
+        }
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-09  17:36:55.138  [main] DEBUG mao.t3.Test:  开始运行
+2022-09-09  17:36:56.146  [pool-2-thread-1] DEBUG mao.t3.Test:  0开始
+2022-09-09  17:36:56.146  [pool-2-thread-2] DEBUG mao.t3.Test:  1开始
+2022-09-09  17:36:59.152  [pool-2-thread-2] DEBUG mao.t3.Test:  1结束
+2022-09-09  17:36:59.152  [pool-2-thread-1] DEBUG mao.t3.Test:  0结束
+2022-09-09  17:36:59.152  [pool-2-thread-2] DEBUG mao.t3.Test:  1开始
+2022-09-09  17:36:59.152  [pool-2-thread-1] DEBUG mao.t3.Test:  0开始
+2022-09-09  17:37:02.158  [pool-2-thread-2] DEBUG mao.t3.Test:  1结束
+2022-09-09  17:37:02.158  [pool-2-thread-1] DEBUG mao.t3.Test:  0结束
+2022-09-09  17:37:02.158  [pool-2-thread-2] DEBUG mao.t3.Test:  1开始
+2022-09-09  17:37:02.158  [pool-2-thread-1] DEBUG mao.t3.Test:  0开始
+2022-09-09  17:37:05.172  [pool-2-thread-2] DEBUG mao.t3.Test:  1结束
+2022-09-09  17:37:05.172  [pool-2-thread-1] DEBUG mao.t3.Test:  0结束
+2022-09-09  17:37:05.172  [pool-2-thread-1] DEBUG mao.t3.Test:  0开始
+2022-09-09  17:37:05.172  [pool-2-thread-2] DEBUG mao.t3.Test:  1开始
+2022-09-09  17:37:08.185  [pool-2-thread-1] DEBUG mao.t3.Test:  0结束
+2022-09-09  17:37:08.185  [pool-2-thread-2] DEBUG mao.t3.Test:  1结束
+2022-09-09  17:37:08.185  [pool-2-thread-1] DEBUG mao.t3.Test:  0开始
+2022-09-09  17:37:08.185  [pool-2-thread-2] DEBUG mao.t3.Test:  1开始
+2022-09-09  17:37:11.200  [pool-2-thread-2] DEBUG mao.t3.Test:  1结束
+2022-09-09  17:37:11.200  [pool-2-thread-1] DEBUG mao.t3.Test:  0结束
+2022-09-09  17:37:11.200  [pool-2-thread-2] DEBUG mao.t3.Test:  1开始
+2022-09-09  17:37:11.200  [pool-2-thread-1] DEBUG mao.t3.Test:  0开始
+```
+
+
+
+间隔被撑到了3s，并且两次之间无时间间隙
+
+
+
+**scheduleWithFixedDelay方法**
+
+
+
+```java
+package mao.t4;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * Project name(项目名称)：java并发编程_任务调度线程池
+ * Package(包名): mao.t4
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/9
+ * Time(创建时间)： 17:41
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args)
+    {
+        log.debug("开始运行");
+        ScheduledExecutorService threadPool = Executors.newScheduledThreadPool(2);
+
+        for (int i = 0; i < 2; i++)
+        {
+            int finalI = i;
+            //提交一个周期性操作，该操作首先在给定的初始延迟之后启用，随后在一个执行的终止和下一个执行的开始之间具有给定的延迟。
+            //任务执行的顺序无限期地继续，直到发生以下异常完成之一：
+            //该任务通过返回的未来显式取消。
+            //执行器终止，也导致任务取消。
+            //任务的执行会引发异常。在这种情况下，在返回的 future 上调用get将抛出ExecutionException ，并将异常作为其原因。
+            //随后的执行被禁止。在返回的未来上对isDone()的后续调用将返回true
+            //参数：
+            //command - 要执行的任务
+            //initialDelay – 延迟首次执行的时间
+            //延迟 - 一个执行的终止和下一个执行的开始之间的延迟
+            //unit – initialDelay 和 delay 参数的时间单位
+            threadPool.scheduleWithFixedDelay(new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    log.debug(finalI + "开始");
+                    try
+                    {
+                        Thread.sleep(1000);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                    log.debug(finalI + "结束");
+                }
+            }, 1, 2, TimeUnit.SECONDS);
+        }
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-09  17:43:42.208  [main] DEBUG mao.t4.Test:  开始运行
+2022-09-09  17:43:43.213  [pool-2-thread-2] DEBUG mao.t4.Test:  1开始
+2022-09-09  17:43:43.213  [pool-2-thread-1] DEBUG mao.t4.Test:  0开始
+2022-09-09  17:43:44.219  [pool-2-thread-2] DEBUG mao.t4.Test:  1结束
+2022-09-09  17:43:44.219  [pool-2-thread-1] DEBUG mao.t4.Test:  0结束
+2022-09-09  17:43:46.232  [pool-2-thread-2] DEBUG mao.t4.Test:  1开始
+2022-09-09  17:43:46.232  [pool-2-thread-1] DEBUG mao.t4.Test:  0开始
+2022-09-09  17:43:47.238  [pool-2-thread-1] DEBUG mao.t4.Test:  0结束
+2022-09-09  17:43:47.238  [pool-2-thread-2] DEBUG mao.t4.Test:  1结束
+2022-09-09  17:43:49.251  [pool-2-thread-1] DEBUG mao.t4.Test:  0开始
+2022-09-09  17:43:49.251  [pool-2-thread-2] DEBUG mao.t4.Test:  1开始
+2022-09-09  17:43:50.265  [pool-2-thread-2] DEBUG mao.t4.Test:  1结束
+2022-09-09  17:43:50.265  [pool-2-thread-1] DEBUG mao.t4.Test:  0结束
+```
+
+
+
+更改休眠时间
+
+```java
+package mao.t4;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * Project name(项目名称)：java并发编程_任务调度线程池
+ * Package(包名): mao.t4
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/9
+ * Time(创建时间)： 17:41
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args)
+    {
+        log.debug("开始运行");
+        ScheduledExecutorService threadPool = Executors.newScheduledThreadPool(2);
+
+        for (int i = 0; i < 2; i++)
+        {
+            int finalI = i;
+            //提交一个周期性操作，该操作首先在给定的初始延迟之后启用，随后在一个执行的终止和下一个执行的开始之间具有给定的延迟。
+            //任务执行的顺序无限期地继续，直到发生以下异常完成之一：
+            //该任务通过返回的未来显式取消。
+            //执行器终止，也导致任务取消。
+            //任务的执行会引发异常。在这种情况下，在返回的 future 上调用get将抛出ExecutionException ，并将异常作为其原因。
+            //随后的执行被禁止。在返回的未来上对isDone()的后续调用将返回true
+            //参数：
+            //command - 要执行的任务
+            //initialDelay – 延迟首次执行的时间
+            //延迟 - 一个执行的终止和下一个执行的开始之间的延迟
+            //unit – initialDelay 和 delay 参数的时间单位
+            threadPool.scheduleWithFixedDelay(new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    log.debug(finalI + "开始");
+                    try
+                    {
+                        Thread.sleep(3000);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                    log.debug(finalI + "结束");
+                }
+            }, 1, 2, TimeUnit.SECONDS);
+        }
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-09  17:45:11.100  [main] DEBUG mao.t4.Test:  开始运行
+2022-09-09  17:45:12.115  [pool-2-thread-1] DEBUG mao.t4.Test:  0开始
+2022-09-09  17:45:12.115  [pool-2-thread-2] DEBUG mao.t4.Test:  1开始
+2022-09-09  17:45:15.125  [pool-2-thread-1] DEBUG mao.t4.Test:  0结束
+2022-09-09  17:45:15.125  [pool-2-thread-2] DEBUG mao.t4.Test:  1结束
+2022-09-09  17:45:17.136  [pool-2-thread-1] DEBUG mao.t4.Test:  0开始
+2022-09-09  17:45:17.136  [pool-2-thread-2] DEBUG mao.t4.Test:  1开始
+2022-09-09  17:45:20.142  [pool-2-thread-1] DEBUG mao.t4.Test:  0结束
+2022-09-09  17:45:20.142  [pool-2-thread-2] DEBUG mao.t4.Test:  1结束
+2022-09-09  17:45:22.147  [pool-2-thread-2] DEBUG mao.t4.Test:  1开始
+2022-09-09  17:45:22.147  [pool-2-thread-1] DEBUG mao.t4.Test:  0开始
+2022-09-09  17:45:25.157  [pool-2-thread-2] DEBUG mao.t4.Test:  1结束
+2022-09-09  17:45:25.157  [pool-2-thread-1] DEBUG mao.t4.Test:  0结束
+2022-09-09  17:45:27.164  [pool-2-thread-1] DEBUG mao.t4.Test:  0开始
+2022-09-09  17:45:27.164  [pool-2-thread-2] DEBUG mao.t4.Test:  1开始
+2022-09-09  17:45:30.166  [pool-2-thread-2] DEBUG mao.t4.Test:  1结束
+2022-09-09  17:45:30.166  [pool-2-thread-1] DEBUG mao.t4.Test:  0结束
+2022-09-09  17:45:32.174  [pool-2-thread-2] DEBUG mao.t4.Test:  1开始
+2022-09-09  17:45:32.174  [pool-2-thread-1] DEBUG mao.t4.Test:  0开始
+2022-09-09  17:45:35.175  [pool-2-thread-1] DEBUG mao.t4.Test:  0结束
+2022-09-09  17:45:35.175  [pool-2-thread-2] DEBUG mao.t4.Test:  1结束
+2022-09-09  17:45:37.179  [pool-2-thread-2] DEBUG mao.t4.Test:  1开始
+2022-09-09  17:45:37.179  [pool-2-thread-1] DEBUG mao.t4.Test:  0开始
+```
+
+
+
+
+
+
+
+### 处理执行任务异常
+
