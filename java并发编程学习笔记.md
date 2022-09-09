@@ -18372,7 +18372,397 @@ public class Test
 
 
 
+整个线程池表现为线程数会根据任务量不断增长，没有上限，当任务执行完毕，空闲 1分钟后释放线程。 适合任务数比较密集，但每个任务执行时间较短的情况
 
 
 
+
+
+```java
+package mao.t2;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+/**
+ * Project name(项目名称)：java并发编程_线程池
+ * Package(包名): mao.t2
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/9
+ * Time(创建时间)： 11:06
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args)
+    {
+        ExecutorService threadPool = Executors.newCachedThreadPool();
+
+        for (int i = 0; i < 20; i++)
+        {
+            int finalI = i;
+            threadPool.submit(new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    log.debug(finalI + "开始运行");
+                    try
+                    {
+                        Thread.sleep(1000);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                    log.debug(finalI + "结束运行");
+                }
+            });
+        }
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-09  11:07:33.511  [pool-2-thread-11] DEBUG mao.t2.Test:  10开始运行
+2022-09-09  11:07:33.511  [pool-2-thread-1] DEBUG mao.t2.Test:  0开始运行
+2022-09-09  11:07:33.511  [pool-2-thread-2] DEBUG mao.t2.Test:  1开始运行
+2022-09-09  11:07:33.511  [pool-2-thread-13] DEBUG mao.t2.Test:  12开始运行
+2022-09-09  11:07:33.511  [pool-2-thread-19] DEBUG mao.t2.Test:  18开始运行
+2022-09-09  11:07:33.511  [pool-2-thread-7] DEBUG mao.t2.Test:  6开始运行
+2022-09-09  11:07:33.511  [pool-2-thread-20] DEBUG mao.t2.Test:  19开始运行
+2022-09-09  11:07:33.511  [pool-2-thread-17] DEBUG mao.t2.Test:  16开始运行
+2022-09-09  11:07:33.511  [pool-2-thread-8] DEBUG mao.t2.Test:  7开始运行
+2022-09-09  11:07:33.511  [pool-2-thread-9] DEBUG mao.t2.Test:  8开始运行
+2022-09-09  11:07:33.511  [pool-2-thread-16] DEBUG mao.t2.Test:  15开始运行
+2022-09-09  11:07:33.511  [pool-2-thread-12] DEBUG mao.t2.Test:  11开始运行
+2022-09-09  11:07:33.511  [pool-2-thread-15] DEBUG mao.t2.Test:  14开始运行
+2022-09-09  11:07:33.511  [pool-2-thread-5] DEBUG mao.t2.Test:  4开始运行
+2022-09-09  11:07:33.511  [pool-2-thread-6] DEBUG mao.t2.Test:  5开始运行
+2022-09-09  11:07:33.511  [pool-2-thread-4] DEBUG mao.t2.Test:  3开始运行
+2022-09-09  11:07:33.511  [pool-2-thread-3] DEBUG mao.t2.Test:  2开始运行
+2022-09-09  11:07:33.511  [pool-2-thread-14] DEBUG mao.t2.Test:  13开始运行
+2022-09-09  11:07:33.511  [pool-2-thread-10] DEBUG mao.t2.Test:  9开始运行
+2022-09-09  11:07:33.511  [pool-2-thread-18] DEBUG mao.t2.Test:  17开始运行
+2022-09-09  11:07:34.515  [pool-2-thread-1] DEBUG mao.t2.Test:  0结束运行
+2022-09-09  11:07:34.515  [pool-2-thread-8] DEBUG mao.t2.Test:  7结束运行
+2022-09-09  11:07:34.515  [pool-2-thread-6] DEBUG mao.t2.Test:  5结束运行
+2022-09-09  11:07:34.515  [pool-2-thread-7] DEBUG mao.t2.Test:  6结束运行
+2022-09-09  11:07:34.515  [pool-2-thread-14] DEBUG mao.t2.Test:  13结束运行
+2022-09-09  11:07:34.515  [pool-2-thread-2] DEBUG mao.t2.Test:  1结束运行
+2022-09-09  11:07:34.515  [pool-2-thread-13] DEBUG mao.t2.Test:  12结束运行
+2022-09-09  11:07:34.515  [pool-2-thread-17] DEBUG mao.t2.Test:  16结束运行
+2022-09-09  11:07:34.515  [pool-2-thread-16] DEBUG mao.t2.Test:  15结束运行
+2022-09-09  11:07:34.515  [pool-2-thread-9] DEBUG mao.t2.Test:  8结束运行
+2022-09-09  11:07:34.515  [pool-2-thread-19] DEBUG mao.t2.Test:  18结束运行
+2022-09-09  11:07:34.515  [pool-2-thread-20] DEBUG mao.t2.Test:  19结束运行
+2022-09-09  11:07:34.515  [pool-2-thread-5] DEBUG mao.t2.Test:  4结束运行
+2022-09-09  11:07:34.517  [pool-2-thread-4] DEBUG mao.t2.Test:  3结束运行
+2022-09-09  11:07:34.517  [pool-2-thread-15] DEBUG mao.t2.Test:  14结束运行
+2022-09-09  11:07:34.517  [pool-2-thread-12] DEBUG mao.t2.Test:  11结束运行
+2022-09-09  11:07:34.517  [pool-2-thread-3] DEBUG mao.t2.Test:  2结束运行
+2022-09-09  11:07:34.524  [pool-2-thread-10] DEBUG mao.t2.Test:  9结束运行
+2022-09-09  11:07:34.524  [pool-2-thread-11] DEBUG mao.t2.Test:  10结束运行
+2022-09-09  11:07:34.524  [pool-2-thread-18] DEBUG mao.t2.Test:  17结束运行
+```
+
+
+
+更改提交的线程数
+
+```java
+package mao.t2;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+/**
+ * Project name(项目名称)：java并发编程_线程池
+ * Package(包名): mao.t2
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/9
+ * Time(创建时间)： 11:06
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args)
+    {
+        ExecutorService threadPool = Executors.newCachedThreadPool();
+
+        for (int i = 0; i < 30; i++)
+        {
+            int finalI = i;
+            threadPool.submit(new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    log.debug(finalI + "开始运行");
+                    try
+                    {
+                        Thread.sleep(1000);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                    log.debug(finalI + "结束运行");
+                }
+            });
+        }
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-09  11:10:41.429  [pool-2-thread-1] DEBUG mao.t2.Test:  0开始运行
+2022-09-09  11:10:41.429  [pool-2-thread-14] DEBUG mao.t2.Test:  13开始运行
+2022-09-09  11:10:41.429  [pool-2-thread-22] DEBUG mao.t2.Test:  21开始运行
+2022-09-09  11:10:41.429  [pool-2-thread-9] DEBUG mao.t2.Test:  8开始运行
+2022-09-09  11:10:41.429  [pool-2-thread-21] DEBUG mao.t2.Test:  20开始运行
+2022-09-09  11:10:41.429  [pool-2-thread-15] DEBUG mao.t2.Test:  14开始运行
+2022-09-09  11:10:41.429  [pool-2-thread-19] DEBUG mao.t2.Test:  18开始运行
+2022-09-09  11:10:41.429  [pool-2-thread-2] DEBUG mao.t2.Test:  1开始运行
+2022-09-09  11:10:41.429  [pool-2-thread-11] DEBUG mao.t2.Test:  10开始运行
+2022-09-09  11:10:41.429  [pool-2-thread-7] DEBUG mao.t2.Test:  6开始运行
+2022-09-09  11:10:41.429  [pool-2-thread-3] DEBUG mao.t2.Test:  2开始运行
+2022-09-09  11:10:41.429  [pool-2-thread-13] DEBUG mao.t2.Test:  12开始运行
+2022-09-09  11:10:41.429  [pool-2-thread-23] DEBUG mao.t2.Test:  22开始运行
+2022-09-09  11:10:41.429  [pool-2-thread-25] DEBUG mao.t2.Test:  24开始运行
+2022-09-09  11:10:41.429  [pool-2-thread-10] DEBUG mao.t2.Test:  9开始运行
+2022-09-09  11:10:41.429  [pool-2-thread-12] DEBUG mao.t2.Test:  11开始运行
+2022-09-09  11:10:41.429  [pool-2-thread-17] DEBUG mao.t2.Test:  16开始运行
+2022-09-09  11:10:41.429  [pool-2-thread-29] DEBUG mao.t2.Test:  28开始运行
+2022-09-09  11:10:41.429  [pool-2-thread-24] DEBUG mao.t2.Test:  23开始运行
+2022-09-09  11:10:41.429  [pool-2-thread-20] DEBUG mao.t2.Test:  19开始运行
+2022-09-09  11:10:41.429  [pool-2-thread-30] DEBUG mao.t2.Test:  29开始运行
+2022-09-09  11:10:41.429  [pool-2-thread-28] DEBUG mao.t2.Test:  27开始运行
+2022-09-09  11:10:41.429  [pool-2-thread-5] DEBUG mao.t2.Test:  4开始运行
+2022-09-09  11:10:41.429  [pool-2-thread-6] DEBUG mao.t2.Test:  5开始运行
+2022-09-09  11:10:41.429  [pool-2-thread-8] DEBUG mao.t2.Test:  7开始运行
+2022-09-09  11:10:41.429  [pool-2-thread-16] DEBUG mao.t2.Test:  15开始运行
+2022-09-09  11:10:41.429  [pool-2-thread-27] DEBUG mao.t2.Test:  26开始运行
+2022-09-09  11:10:41.429  [pool-2-thread-4] DEBUG mao.t2.Test:  3开始运行
+2022-09-09  11:10:41.429  [pool-2-thread-18] DEBUG mao.t2.Test:  17开始运行
+2022-09-09  11:10:41.429  [pool-2-thread-26] DEBUG mao.t2.Test:  25开始运行
+2022-09-09  11:10:42.433  [pool-2-thread-13] DEBUG mao.t2.Test:  12结束运行
+2022-09-09  11:10:42.434  [pool-2-thread-14] DEBUG mao.t2.Test:  13结束运行
+2022-09-09  11:10:42.434  [pool-2-thread-3] DEBUG mao.t2.Test:  2结束运行
+2022-09-09  11:10:42.434  [pool-2-thread-9] DEBUG mao.t2.Test:  8结束运行
+2022-09-09  11:10:42.434  [pool-2-thread-15] DEBUG mao.t2.Test:  14结束运行
+2022-09-09  11:10:42.434  [pool-2-thread-19] DEBUG mao.t2.Test:  18结束运行
+2022-09-09  11:10:42.434  [pool-2-thread-21] DEBUG mao.t2.Test:  20结束运行
+2022-09-09  11:10:42.434  [pool-2-thread-11] DEBUG mao.t2.Test:  10结束运行
+2022-09-09  11:10:42.434  [pool-2-thread-7] DEBUG mao.t2.Test:  6结束运行
+2022-09-09  11:10:42.434  [pool-2-thread-2] DEBUG mao.t2.Test:  1结束运行
+2022-09-09  11:10:42.434  [pool-2-thread-22] DEBUG mao.t2.Test:  21结束运行
+2022-09-09  11:10:42.448  [pool-2-thread-1] DEBUG mao.t2.Test:  0结束运行
+2022-09-09  11:10:42.448  [pool-2-thread-20] DEBUG mao.t2.Test:  19结束运行
+2022-09-09  11:10:42.448  [pool-2-thread-6] DEBUG mao.t2.Test:  5结束运行
+2022-09-09  11:10:42.448  [pool-2-thread-27] DEBUG mao.t2.Test:  26结束运行
+2022-09-09  11:10:42.448  [pool-2-thread-8] DEBUG mao.t2.Test:  7结束运行
+2022-09-09  11:10:42.448  [pool-2-thread-23] DEBUG mao.t2.Test:  22结束运行
+2022-09-09  11:10:42.448  [pool-2-thread-4] DEBUG mao.t2.Test:  3结束运行
+2022-09-09  11:10:42.448  [pool-2-thread-30] DEBUG mao.t2.Test:  29结束运行
+2022-09-09  11:10:42.448  [pool-2-thread-29] DEBUG mao.t2.Test:  28结束运行
+2022-09-09  11:10:42.448  [pool-2-thread-12] DEBUG mao.t2.Test:  11结束运行
+2022-09-09  11:10:42.448  [pool-2-thread-17] DEBUG mao.t2.Test:  16结束运行
+2022-09-09  11:10:42.448  [pool-2-thread-25] DEBUG mao.t2.Test:  24结束运行
+2022-09-09  11:10:42.448  [pool-2-thread-24] DEBUG mao.t2.Test:  23结束运行
+2022-09-09  11:10:42.448  [pool-2-thread-18] DEBUG mao.t2.Test:  17结束运行
+2022-09-09  11:10:42.448  [pool-2-thread-28] DEBUG mao.t2.Test:  27结束运行
+2022-09-09  11:10:42.448  [pool-2-thread-16] DEBUG mao.t2.Test:  15结束运行
+2022-09-09  11:10:42.448  [pool-2-thread-26] DEBUG mao.t2.Test:  25结束运行
+2022-09-09  11:10:42.448  [pool-2-thread-10] DEBUG mao.t2.Test:  9结束运行
+2022-09-09  11:10:42.448  [pool-2-thread-5] DEBUG mao.t2.Test:  4结束运行
+```
+
+
+
+
+
+###  newSingleThreadExecutor
+
+```java
+
+    /**
+     * Creates an Executor that uses a single worker thread operating
+     * off an unbounded queue. (Note however that if this single
+     * thread terminates due to a failure during execution prior to
+     * shutdown, a new one will take its place if needed to execute
+     * subsequent tasks.)  Tasks are guaranteed to execute
+     * sequentially, and no more than one task will be active at any
+     * given time. Unlike the otherwise equivalent
+     * {@code newFixedThreadPool(1)} the returned executor is
+     * guaranteed not to be reconfigurable to use additional threads.
+     *
+     * @return the newly created single-threaded Executor
+     */
+    public static ExecutorService newSingleThreadExecutor() {
+        return new FinalizableDelegatedExecutorService
+            (new ThreadPoolExecutor(1, 1,
+                                    0L, TimeUnit.MILLISECONDS,
+                                    new LinkedBlockingQueue<Runnable>()));
+    }
+```
+
+
+
+希望多个任务排队执行。线程数固定为 1，任务数多于 1 时，会放入无界队列排队。任务执行完毕，这唯一的线程 也不会被释放
+
+* 自己创建一个单线程串行执行任务，如果任务执行失败而终止那么没有任何补救措施，而线程池还会新建一个线程，保证池的正常工作
+* Executors.newSingleThreadExecutor() 线程个数始终为1，不能修改
+  * FinalizableDelegatedExecutorService 应用的是装饰器模式，只对外暴露了 ExecutorService 接口，因此不能调用 ThreadPoolExecutor 中特有的方法
+* Executors.newFixedThreadPool(1) 初始时为1，以后还可以修改
+  * 对外暴露的是 ThreadPoolExecutor 对象，可以强转后调用 setCorePoolSize 等方法进行修改
+
+
+
+```java
+package mao.t3;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+/**
+ * Project name(项目名称)：java并发编程_线程池
+ * Package(包名): mao.t3
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/9
+ * Time(创建时间)： 11:11
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args)
+    {
+        ExecutorService threadPool = Executors.newSingleThreadExecutor();
+
+        for (int i = 0; i < 20; i++)
+        {
+            int finalI = i;
+            threadPool.submit(new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    log.debug(finalI + "开始运行");
+                    try
+                    {
+                        Thread.sleep(1000);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                    log.debug(finalI + "结束运行");
+                }
+            });
+        }
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-09  11:16:22.399  [pool-2-thread-1] DEBUG mao.t3.Test:  0开始运行
+2022-09-09  11:16:23.414  [pool-2-thread-1] DEBUG mao.t3.Test:  0结束运行
+2022-09-09  11:16:23.414  [pool-2-thread-1] DEBUG mao.t3.Test:  1开始运行
+2022-09-09  11:16:24.419  [pool-2-thread-1] DEBUG mao.t3.Test:  1结束运行
+2022-09-09  11:16:24.419  [pool-2-thread-1] DEBUG mao.t3.Test:  2开始运行
+2022-09-09  11:16:25.430  [pool-2-thread-1] DEBUG mao.t3.Test:  2结束运行
+2022-09-09  11:16:25.430  [pool-2-thread-1] DEBUG mao.t3.Test:  3开始运行
+2022-09-09  11:16:26.434  [pool-2-thread-1] DEBUG mao.t3.Test:  3结束运行
+2022-09-09  11:16:26.434  [pool-2-thread-1] DEBUG mao.t3.Test:  4开始运行
+2022-09-09  11:16:27.439  [pool-2-thread-1] DEBUG mao.t3.Test:  4结束运行
+2022-09-09  11:16:27.439  [pool-2-thread-1] DEBUG mao.t3.Test:  5开始运行
+2022-09-09  11:16:28.448  [pool-2-thread-1] DEBUG mao.t3.Test:  5结束运行
+2022-09-09  11:16:28.448  [pool-2-thread-1] DEBUG mao.t3.Test:  6开始运行
+2022-09-09  11:16:29.453  [pool-2-thread-1] DEBUG mao.t3.Test:  6结束运行
+2022-09-09  11:16:29.453  [pool-2-thread-1] DEBUG mao.t3.Test:  7开始运行
+2022-09-09  11:16:30.466  [pool-2-thread-1] DEBUG mao.t3.Test:  7结束运行
+2022-09-09  11:16:30.466  [pool-2-thread-1] DEBUG mao.t3.Test:  8开始运行
+2022-09-09  11:16:31.468  [pool-2-thread-1] DEBUG mao.t3.Test:  8结束运行
+2022-09-09  11:16:31.468  [pool-2-thread-1] DEBUG mao.t3.Test:  9开始运行
+2022-09-09  11:16:32.483  [pool-2-thread-1] DEBUG mao.t3.Test:  9结束运行
+2022-09-09  11:16:32.483  [pool-2-thread-1] DEBUG mao.t3.Test:  10开始运行
+2022-09-09  11:16:33.488  [pool-2-thread-1] DEBUG mao.t3.Test:  10结束运行
+2022-09-09  11:16:33.488  [pool-2-thread-1] DEBUG mao.t3.Test:  11开始运行
+2022-09-09  11:16:34.496  [pool-2-thread-1] DEBUG mao.t3.Test:  11结束运行
+2022-09-09  11:16:34.496  [pool-2-thread-1] DEBUG mao.t3.Test:  12开始运行
+2022-09-09  11:16:35.501  [pool-2-thread-1] DEBUG mao.t3.Test:  12结束运行
+2022-09-09  11:16:35.501  [pool-2-thread-1] DEBUG mao.t3.Test:  13开始运行
+2022-09-09  11:16:36.510  [pool-2-thread-1] DEBUG mao.t3.Test:  13结束运行
+2022-09-09  11:16:36.510  [pool-2-thread-1] DEBUG mao.t3.Test:  14开始运行
+2022-09-09  11:16:37.511  [pool-2-thread-1] DEBUG mao.t3.Test:  14结束运行
+2022-09-09  11:16:37.511  [pool-2-thread-1] DEBUG mao.t3.Test:  15开始运行
+2022-09-09  11:16:38.512  [pool-2-thread-1] DEBUG mao.t3.Test:  15结束运行
+2022-09-09  11:16:38.512  [pool-2-thread-1] DEBUG mao.t3.Test:  16开始运行
+2022-09-09  11:16:39.521  [pool-2-thread-1] DEBUG mao.t3.Test:  16结束运行
+2022-09-09  11:16:39.521  [pool-2-thread-1] DEBUG mao.t3.Test:  17开始运行
+2022-09-09  11:16:40.527  [pool-2-thread-1] DEBUG mao.t3.Test:  17结束运行
+2022-09-09  11:16:40.527  [pool-2-thread-1] DEBUG mao.t3.Test:  18开始运行
+2022-09-09  11:16:41.541  [pool-2-thread-1] DEBUG mao.t3.Test:  18结束运行
+2022-09-09  11:16:41.541  [pool-2-thread-1] DEBUG mao.t3.Test:  19开始运行
+2022-09-09  11:16:42.547  [pool-2-thread-1] DEBUG mao.t3.Test:  19结束运行
+```
+
+
+
+
+
+
+
+### 提交任务
 
