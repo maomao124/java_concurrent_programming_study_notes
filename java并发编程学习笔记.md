@@ -20027,3 +20027,323 @@ boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedExceptio
 
 ### 异步模式之工作线程
 
+#### 定义
+
+让有限的工作线程（Worker Thread）来轮流异步处理无限多的任务。也可以将其归类为分工模式，它的典型实现 就是线程池，也体现了经典设计模式中的享元模式
+
+
+
+例如，海底捞的服务员（线程），轮流处理每位客人的点餐（任务），如果为每位客人都配一名专属的服务员，那 么成本就太高了（对比另一种多线程设计模式：Thread-Per-Message） 
+
+注意，不同任务类型应该使用不同的线程池，这样能够避免饥饿，并能提升效率 
+
+例如，如果一个餐馆的工人既要招呼客人（任务类型A），又要到后厨做菜（任务类型B）显然效率不咋地，分成 服务员（线程池A）与厨师（线程池B）更为合理，当然你能想到更细致的分工
+
+
+
+
+
+#### 饥饿
+
+固定大小线程池会有饥饿现象
+
+* 两个工人是同一个线程池中的两个线程
+* 他们要做的事情是：为客人点餐和到后厨做菜，这是两个阶段的工作
+  * 客人点餐：必须先点完餐，等菜做好，上菜，在此期间处理点餐的工人必须等待
+  * 后厨做菜
+* 比如工人A 处理了点餐任务，接下来它要等着 工人B 把菜做好，然后上菜，他俩也配合的很好
+* 但现在同时来了两个客人，这个时候工人A 和工人B 都去处理点餐了，这时没人做饭了，饥饿
+
+
+
+
+
+```java
+package mao.t1;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.*;
+
+/**
+ * Project name(项目名称)：java并发编程_异步模式之工作线程
+ * Package(包名): mao.t1
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/9
+ * Time(创建时间)： 13:38
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args)
+    {
+        ExecutorService threadPool = Executors.newFixedThreadPool(2);
+
+        extracted(threadPool, "西红柿炒番茄");
+    }
+
+    /**
+     * 提取
+     *
+     * @param threadPool 线程池
+     * @param order      订单，菜名
+     */
+    private static void extracted(ExecutorService threadPool, String order)
+    {
+        threadPool.execute(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                log.debug("点餐：" + order);
+                Future<String> future = threadPool.submit(new Callable<String>()
+                {
+                    @Override
+                    public String call() throws Exception
+                    {
+                        log.debug("做菜：" + order);
+                        return order;
+                    }
+                });
+                try
+                {
+                    log.debug("上菜：" + future.get());
+                }
+                catch (InterruptedException | ExecutionException e)
+                {
+                    e.printStackTrace();
+                }
+            }
+        });
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-09  13:49:31.580  [pool-2-thread-1] DEBUG mao.t1.Test:  点餐：西红柿炒番茄
+2022-09-09  13:49:31.584  [pool-2-thread-2] DEBUG mao.t1.Test:  做菜：西红柿炒番茄
+2022-09-09  13:49:31.584  [pool-2-thread-1] DEBUG mao.t1.Test:  上菜：西红柿炒番茄
+```
+
+
+
+
+
+再添加一位客人
+
+```java
+package mao.t1;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.*;
+
+/**
+ * Project name(项目名称)：java并发编程_异步模式之工作线程
+ * Package(包名): mao.t1
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/9
+ * Time(创建时间)： 13:38
+ * Version(版本): 1.0
+ * Description(描述)： 饥饿现象
+ */
+
+public class Test
+{
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args)
+    {
+        ExecutorService threadPool = Executors.newFixedThreadPool(2);
+
+        extracted(threadPool, "西红柿炒番茄");
+        extracted(threadPool, "土豆炒马铃薯");
+    }
+
+    /**
+     * 提取
+     *
+     * @param threadPool 线程池
+     * @param order      订单，菜名
+     */
+    private static void extracted(ExecutorService threadPool, String order)
+    {
+        threadPool.execute(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                log.debug("点餐：" + order);
+                Future<String> future = threadPool.submit(new Callable<String>()
+                {
+                    @Override
+                    public String call() throws Exception
+                    {
+                        log.debug("做菜：" + order);
+                        return order;
+                    }
+                });
+                try
+                {
+                    log.debug("上菜：" + future.get());
+                }
+                catch (InterruptedException | ExecutionException e)
+                {
+                    e.printStackTrace();
+                }
+            }
+        });
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-09  13:51:15.229  [pool-2-thread-2] DEBUG mao.t1.Test:  点餐：土豆炒马铃薯
+2022-09-09  13:51:15.229  [pool-2-thread-1] DEBUG mao.t1.Test:  点餐：西红柿炒番茄
+//在这里卡着...
+```
+
+
+
+产生了饥饿现象
+
+
+
+
+
+#### 解决饥饿现象
+
+解决方法可以增加线程池的大小，不过不是根本解决方案。可以根据不同的任务类型，采用不同的线程池
+
+
+
+```java
+package mao.t2;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.*;
+
+/**
+ * Project name(项目名称)：java并发编程_异步模式之工作线程
+ * Package(包名): mao.t2
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/9
+ * Time(创建时间)： 13:54
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args)
+    {
+        ExecutorService threadPool1 = Executors.newFixedThreadPool(1);
+        ExecutorService threadPool2 = Executors.newFixedThreadPool(1);
+
+        extracted(threadPool1, threadPool2, "西红柿炒番茄");
+        extracted(threadPool1, threadPool2, "土豆炒马铃薯");
+    }
+
+
+    /**
+     * 提取
+     *
+     * @param threadPool1 线程pool1
+     * @param threadPool2 线程pool2
+     * @param order       订单
+     */
+    private static void extracted(ExecutorService threadPool1, ExecutorService threadPool2, String order)
+    {
+        threadPool1.execute(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                log.debug("点餐：" + order);
+                Future<String> future = threadPool2.submit(new Callable<String>()
+                {
+                    @Override
+                    public String call() throws Exception
+                    {
+                        log.debug("做菜：" + order);
+                        return order;
+                    }
+                });
+                try
+                {
+                    log.debug("上菜：" + future.get());
+                }
+                catch (InterruptedException | ExecutionException e)
+                {
+                    e.printStackTrace();
+                }
+            }
+        });
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-09  13:57:59.529  [pool-2-thread-1] DEBUG mao.t2.Test:  点餐：西红柿炒番茄
+2022-09-09  13:57:59.533  [pool-3-thread-1] DEBUG mao.t2.Test:  做菜：西红柿炒番茄
+2022-09-09  13:57:59.534  [pool-2-thread-1] DEBUG mao.t2.Test:  上菜：西红柿炒番茄
+2022-09-09  13:57:59.534  [pool-2-thread-1] DEBUG mao.t2.Test:  点餐：土豆炒马铃薯
+2022-09-09  13:57:59.535  [pool-3-thread-1] DEBUG mao.t2.Test:  做菜：土豆炒马铃薯
+2022-09-09  13:57:59.535  [pool-2-thread-1] DEBUG mao.t2.Test:  上菜：土豆炒马铃薯
+```
+
+
+
+
+
+
+
+### 创建多少线程池合适
+
+* 过小会导致程序不能充分地利用系统资源、容易导致饥饿
+* 过大会导致更多的线程上下文切换，占用更多内存
+
+
+
+####  CPU 密集型运算
+
