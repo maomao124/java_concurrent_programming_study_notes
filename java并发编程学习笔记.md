@@ -18766,3 +18766,659 @@ public class Test
 
 ### 提交任务
 
+#### execute
+
+```java
+//在将来的某个时间执行给定的命令。根据Executor实现的判断，该命令可以在新线程、池线程或调用线程中执行
+void execute(Runnable command);
+```
+
+
+
+```java
+package mao.t4;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+/**
+ * Project name(项目名称)：java并发编程_线程池
+ * Package(包名): mao.t4
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/9
+ * Time(创建时间)： 11:18
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args)
+    {
+        ExecutorService threadPool = Executors.newFixedThreadPool(4);
+
+        for (int i = 0; i < 20; i++)
+        {
+            int finalI = i;
+            threadPool.execute(new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    log.debug(finalI + "开始运行");
+                    try
+                    {
+                        Thread.sleep(1000);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                }
+            });
+        }
+    }
+}
+```
+
+
+
+```sh
+2022-09-09  11:24:05.065  [pool-2-thread-4] DEBUG mao.t4.Test:  3开始运行
+2022-09-09  11:24:05.065  [pool-2-thread-2] DEBUG mao.t4.Test:  1开始运行
+2022-09-09  11:24:05.065  [pool-2-thread-1] DEBUG mao.t4.Test:  0开始运行
+2022-09-09  11:24:05.065  [pool-2-thread-3] DEBUG mao.t4.Test:  2开始运行
+2022-09-09  11:24:06.080  [pool-2-thread-1] DEBUG mao.t4.Test:  4开始运行
+2022-09-09  11:24:06.080  [pool-2-thread-3] DEBUG mao.t4.Test:  5开始运行
+2022-09-09  11:24:06.080  [pool-2-thread-4] DEBUG mao.t4.Test:  7开始运行
+2022-09-09  11:24:06.080  [pool-2-thread-2] DEBUG mao.t4.Test:  6开始运行
+2022-09-09  11:24:07.081  [pool-2-thread-3] DEBUG mao.t4.Test:  8开始运行
+2022-09-09  11:24:07.094  [pool-2-thread-4] DEBUG mao.t4.Test:  11开始运行
+2022-09-09  11:24:07.094  [pool-2-thread-2] DEBUG mao.t4.Test:  9开始运行
+2022-09-09  11:24:07.094  [pool-2-thread-1] DEBUG mao.t4.Test:  10开始运行
+2022-09-09  11:24:08.088  [pool-2-thread-3] DEBUG mao.t4.Test:  12开始运行
+2022-09-09  11:24:08.104  [pool-2-thread-4] DEBUG mao.t4.Test:  13开始运行
+2022-09-09  11:24:08.104  [pool-2-thread-1] DEBUG mao.t4.Test:  15开始运行
+2022-09-09  11:24:08.104  [pool-2-thread-2] DEBUG mao.t4.Test:  14开始运行
+2022-09-09  11:24:09.098  [pool-2-thread-3] DEBUG mao.t4.Test:  16开始运行
+2022-09-09  11:24:09.114  [pool-2-thread-2] DEBUG mao.t4.Test:  18开始运行
+2022-09-09  11:24:09.114  [pool-2-thread-1] DEBUG mao.t4.Test:  17开始运行
+2022-09-09  11:24:09.114  [pool-2-thread-4] DEBUG mao.t4.Test:  19开始运行
+```
+
+
+
+
+
+#### submit
+
+
+
+```java
+//提交一个返回值的任务以供执行，并返回一个表示该任务待处理结果的 Future。 Future 的get方法将在成功完成后返回任务的结果。
+//如果您想立即阻止等待任务，可以使用result = exec.submit(aCallable).get();形式的结构。
+//注意： Executors类包含一组方法，可以将一些其他常见的类似闭包的对象（例如java.security.PrivilegedAction ）转换为Callable形式，
+//以便可以提交它们
+<T> Future<T> submit(Callable<T> task);
+```
+
+
+
+```java
+package mao.t5;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.*;
+
+/**
+ * Project name(项目名称)：java并发编程_线程池
+ * Package(包名): mao.t5
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/9
+ * Time(创建时间)： 11:25
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args) throws ExecutionException, InterruptedException
+    {
+        ExecutorService threadPool = Executors.newFixedThreadPool(4);
+        List<Future<Integer>> futures = new ArrayList<>();
+
+        for (int i = 0; i < 20; i++)
+        {
+            int finalI = i;
+            //提交一个返回值的任务以供执行，并返回一个表示该任务待处理结果的 Future。 Future 的get方法将在成功完成后返回任务的结果。
+            //如果您想立即阻止等待任务，可以使用result = exec.submit(aCallable).get();形式的结构。
+            //注意： Executors类包含一组方法，可以将一些其他常见的类似闭包的对象（例如java.security.PrivilegedAction ）转换为Callable形式，
+            //以便可以提交它们
+            Future<Integer> future = threadPool.submit(new Callable<Integer>()
+            {
+                @Override
+                public Integer call() throws Exception
+                {
+                    log.debug(finalI + "开始运行");
+                    try
+                    {
+                        Thread.sleep(1000);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                    return finalI;
+                }
+            });
+            futures.add(future);
+        }
+
+        for (Future<Integer> future : futures)
+        {
+            Integer integer = future.get();
+            log.debug("结果：" + integer);
+        }
+    }
+}
+```
+
+
+
+```sh
+2022-09-09  11:35:40.113  [pool-2-thread-4] DEBUG mao.t5.Test:  3开始运行
+2022-09-09  11:35:40.113  [pool-2-thread-2] DEBUG mao.t5.Test:  1开始运行
+2022-09-09  11:35:40.113  [pool-2-thread-3] DEBUG mao.t5.Test:  2开始运行
+2022-09-09  11:35:40.113  [pool-2-thread-1] DEBUG mao.t5.Test:  0开始运行
+2022-09-09  11:35:41.125  [pool-2-thread-1] DEBUG mao.t5.Test:  7开始运行
+2022-09-09  11:35:41.125  [pool-2-thread-3] DEBUG mao.t5.Test:  6开始运行
+2022-09-09  11:35:41.125  [pool-2-thread-2] DEBUG mao.t5.Test:  5开始运行
+2022-09-09  11:35:41.125  [pool-2-thread-4] DEBUG mao.t5.Test:  4开始运行
+2022-09-09  11:35:41.125  [main] DEBUG mao.t5.Test:  结果：0
+2022-09-09  11:35:41.126  [main] DEBUG mao.t5.Test:  结果：1
+2022-09-09  11:35:41.126  [main] DEBUG mao.t5.Test:  结果：2
+2022-09-09  11:35:41.126  [main] DEBUG mao.t5.Test:  结果：3
+2022-09-09  11:35:42.126  [pool-2-thread-1] DEBUG mao.t5.Test:  8开始运行
+2022-09-09  11:35:42.140  [pool-2-thread-2] DEBUG mao.t5.Test:  9开始运行
+2022-09-09  11:35:42.140  [main] DEBUG mao.t5.Test:  结果：4
+2022-09-09  11:35:42.140  [pool-2-thread-4] DEBUG mao.t5.Test:  10开始运行
+2022-09-09  11:35:42.140  [pool-2-thread-3] DEBUG mao.t5.Test:  11开始运行
+2022-09-09  11:35:42.140  [main] DEBUG mao.t5.Test:  结果：5
+2022-09-09  11:35:42.140  [main] DEBUG mao.t5.Test:  结果：6
+2022-09-09  11:35:42.140  [main] DEBUG mao.t5.Test:  结果：7
+2022-09-09  11:35:43.136  [pool-2-thread-1] DEBUG mao.t5.Test:  12开始运行
+2022-09-09  11:35:43.136  [main] DEBUG mao.t5.Test:  结果：8
+2022-09-09  11:35:43.152  [pool-2-thread-3] DEBUG mao.t5.Test:  15开始运行
+2022-09-09  11:35:43.152  [main] DEBUG mao.t5.Test:  结果：9
+2022-09-09  11:35:43.152  [pool-2-thread-2] DEBUG mao.t5.Test:  14开始运行
+2022-09-09  11:35:43.152  [pool-2-thread-4] DEBUG mao.t5.Test:  13开始运行
+2022-09-09  11:35:43.152  [main] DEBUG mao.t5.Test:  结果：10
+2022-09-09  11:35:43.152  [main] DEBUG mao.t5.Test:  结果：11
+2022-09-09  11:35:44.148  [main] DEBUG mao.t5.Test:  结果：12
+2022-09-09  11:35:44.148  [pool-2-thread-1] DEBUG mao.t5.Test:  16开始运行
+2022-09-09  11:35:44.163  [pool-2-thread-3] DEBUG mao.t5.Test:  17开始运行
+2022-09-09  11:35:44.163  [main] DEBUG mao.t5.Test:  结果：13
+2022-09-09  11:35:44.163  [pool-2-thread-2] DEBUG mao.t5.Test:  18开始运行
+2022-09-09  11:35:44.163  [pool-2-thread-4] DEBUG mao.t5.Test:  19开始运行
+2022-09-09  11:35:44.163  [main] DEBUG mao.t5.Test:  结果：14
+2022-09-09  11:35:44.163  [main] DEBUG mao.t5.Test:  结果：15
+2022-09-09  11:35:45.156  [main] DEBUG mao.t5.Test:  结果：16
+2022-09-09  11:35:45.163  [main] DEBUG mao.t5.Test:  结果：17
+2022-09-09  11:35:45.172  [main] DEBUG mao.t5.Test:  结果：18
+2022-09-09  11:35:45.172  [main] DEBUG mao.t5.Test:  结果：19
+```
+
+
+
+
+
+#### invokeAll
+
+
+
+```java
+//执行给定的任务，返回一个 Futures 列表，在所有完成时保存它们的状态和结果。 
+// Future.isDone对于返回列表的每个元素都是true 。
+// 请注意，已完成的任务可能已经正常终止，也可能通过引发异常终止。
+// 如果在此操作进行时修改了给定的集合，则此方法的结果是不确定的
+<T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks)
+ throws InterruptedException;
+// 提交 tasks 中所有任务，带超时时间
+<T> List<Future<T>> invokeAll(Collection<? extends Callable<T>> tasks,
+ long timeout, TimeUnit unit)
+ throws InterruptedException;
+```
+
+
+
+```java
+package mao.t6;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.*;
+
+/**
+ * Project name(项目名称)：java并发编程_线程池
+ * Package(包名): mao.t6
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/9
+ * Time(创建时间)： 11:36
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args) throws ExecutionException, InterruptedException
+    {
+        ExecutorService threadPool = Executors.newFixedThreadPool(4);
+
+        List<Callable<Integer>> tasks = new ArrayList<>();
+
+        for (int i = 0; i < 20; i++)
+        {
+            int finalI = i;
+
+            tasks.add(new Callable<Integer>()
+            {
+                @Override
+                public Integer call() throws Exception
+                {
+                    log.debug(finalI + "开始运行");
+                    try
+                    {
+                        Thread.sleep(1000);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                    return finalI;
+                }
+            });
+
+        }
+
+        List<Future<Integer>> futures = threadPool.invokeAll(tasks);
+        for (Future<Integer> future : futures)
+        {
+            Integer integer = future.get();
+            log.debug("结果：" + integer);
+        }
+    }
+}
+```
+
+
+
+```sh
+2022-09-09  11:39:45.288  [pool-2-thread-1] DEBUG mao.t6.Test:  0开始运行
+2022-09-09  11:39:45.288  [pool-2-thread-3] DEBUG mao.t6.Test:  2开始运行
+2022-09-09  11:39:45.288  [pool-2-thread-2] DEBUG mao.t6.Test:  1开始运行
+2022-09-09  11:39:45.288  [pool-2-thread-4] DEBUG mao.t6.Test:  3开始运行
+2022-09-09  11:39:46.294  [pool-2-thread-1] DEBUG mao.t6.Test:  6开始运行
+2022-09-09  11:39:46.294  [pool-2-thread-3] DEBUG mao.t6.Test:  7开始运行
+2022-09-09  11:39:46.294  [pool-2-thread-2] DEBUG mao.t6.Test:  5开始运行
+2022-09-09  11:39:46.294  [pool-2-thread-4] DEBUG mao.t6.Test:  4开始运行
+2022-09-09  11:39:47.295  [pool-2-thread-1] DEBUG mao.t6.Test:  8开始运行
+2022-09-09  11:39:47.297  [pool-2-thread-4] DEBUG mao.t6.Test:  9开始运行
+2022-09-09  11:39:47.297  [pool-2-thread-3] DEBUG mao.t6.Test:  11开始运行
+2022-09-09  11:39:47.297  [pool-2-thread-2] DEBUG mao.t6.Test:  10开始运行
+2022-09-09  11:39:48.309  [pool-2-thread-1] DEBUG mao.t6.Test:  13开始运行
+2022-09-09  11:39:48.309  [pool-2-thread-2] DEBUG mao.t6.Test:  12开始运行
+2022-09-09  11:39:48.309  [pool-2-thread-3] DEBUG mao.t6.Test:  15开始运行
+2022-09-09  11:39:48.309  [pool-2-thread-4] DEBUG mao.t6.Test:  14开始运行
+2022-09-09  11:39:49.310  [pool-2-thread-1] DEBUG mao.t6.Test:  16开始运行
+2022-09-09  11:39:49.313  [pool-2-thread-4] DEBUG mao.t6.Test:  17开始运行
+2022-09-09  11:39:49.313  [pool-2-thread-2] DEBUG mao.t6.Test:  19开始运行
+2022-09-09  11:39:49.313  [pool-2-thread-3] DEBUG mao.t6.Test:  18开始运行
+2022-09-09  11:39:50.315  [main] DEBUG mao.t6.Test:  结果：0
+2022-09-09  11:39:50.315  [main] DEBUG mao.t6.Test:  结果：1
+2022-09-09  11:39:50.315  [main] DEBUG mao.t6.Test:  结果：2
+2022-09-09  11:39:50.315  [main] DEBUG mao.t6.Test:  结果：3
+2022-09-09  11:39:50.316  [main] DEBUG mao.t6.Test:  结果：4
+2022-09-09  11:39:50.316  [main] DEBUG mao.t6.Test:  结果：5
+2022-09-09  11:39:50.316  [main] DEBUG mao.t6.Test:  结果：6
+2022-09-09  11:39:50.316  [main] DEBUG mao.t6.Test:  结果：7
+2022-09-09  11:39:50.316  [main] DEBUG mao.t6.Test:  结果：8
+2022-09-09  11:39:50.316  [main] DEBUG mao.t6.Test:  结果：9
+2022-09-09  11:39:50.316  [main] DEBUG mao.t6.Test:  结果：10
+2022-09-09  11:39:50.316  [main] DEBUG mao.t6.Test:  结果：11
+2022-09-09  11:39:50.316  [main] DEBUG mao.t6.Test:  结果：12
+2022-09-09  11:39:50.316  [main] DEBUG mao.t6.Test:  结果：13
+2022-09-09  11:39:50.316  [main] DEBUG mao.t6.Test:  结果：14
+2022-09-09  11:39:50.316  [main] DEBUG mao.t6.Test:  结果：15
+2022-09-09  11:39:50.316  [main] DEBUG mao.t6.Test:  结果：16
+2022-09-09  11:39:50.317  [main] DEBUG mao.t6.Test:  结果：17
+2022-09-09  11:39:50.317  [main] DEBUG mao.t6.Test:  结果：18
+2022-09-09  11:39:50.317  [main] DEBUG mao.t6.Test:  结果：19
+```
+
+
+
+
+
+带超时时间
+
+```java
+package mao.t7;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.*;
+
+/**
+ * Project name(项目名称)：java并发编程_线程池
+ * Package(包名): mao.t7
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/9
+ * Time(创建时间)： 11:41
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args) throws ExecutionException, InterruptedException
+    {
+        ExecutorService threadPool = Executors.newFixedThreadPool(4);
+
+        List<Callable<Integer>> tasks = new ArrayList<>();
+
+        for (int i = 0; i < 20; i++)
+        {
+            int finalI = i;
+
+            tasks.add(new Callable<Integer>()
+            {
+                @Override
+                public Integer call() throws Exception
+                {
+                    log.debug(finalI + "开始运行");
+                    try
+                    {
+                        Thread.sleep(1000);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                    return finalI;
+                }
+            });
+
+        }
+
+
+        List<Future<Integer>> futures = threadPool.invokeAll(tasks, 3, TimeUnit.SECONDS);
+        for (Future<Integer> future : futures)
+        {
+            Integer integer = future.get();
+            log.debug("结果：" + integer);
+        }
+    }
+}
+```
+
+
+
+```sh
+2022-09-09  11:42:57.676  [pool-2-thread-4] DEBUG mao.t7.Test:  3开始运行
+2022-09-09  11:42:57.676  [pool-2-thread-1] DEBUG mao.t7.Test:  0开始运行
+2022-09-09  11:42:57.676  [pool-2-thread-3] DEBUG mao.t7.Test:  2开始运行
+2022-09-09  11:42:57.676  [pool-2-thread-2] DEBUG mao.t7.Test:  1开始运行
+2022-09-09  11:42:58.682  [pool-2-thread-4] DEBUG mao.t7.Test:  4开始运行
+2022-09-09  11:42:58.682  [pool-2-thread-2] DEBUG mao.t7.Test:  5开始运行
+2022-09-09  11:42:58.682  [pool-2-thread-3] DEBUG mao.t7.Test:  6开始运行
+2022-09-09  11:42:58.682  [pool-2-thread-1] DEBUG mao.t7.Test:  7开始运行
+2022-09-09  11:42:59.685  [pool-2-thread-2] DEBUG mao.t7.Test:  8开始运行
+2022-09-09  11:42:59.690  [pool-2-thread-1] DEBUG mao.t7.Test:  9开始运行
+2022-09-09  11:42:59.690  [pool-2-thread-3] DEBUG mao.t7.Test:  11开始运行
+2022-09-09  11:42:59.690  [pool-2-thread-4] DEBUG mao.t7.Test:  10开始运行
+java.lang.InterruptedException: sleep interrupted
+	at java.base/java.lang.Thread.sleep(Native Method)
+	at mao.t7.Test$1.call(Test.java:48)
+	at mao.t7.Test$1.call(Test.java:41)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:264)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1130)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:630)
+	at java.base/java.lang.Thread.run(Thread.java:831)
+java.lang.InterruptedException: sleep interrupted
+	at java.base/java.lang.Thread.sleep(Native Method)
+	at mao.t7.Test$1.call(Test.java:48)
+	at mao.t7.Test$1.call(Test.java:41)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:264)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1130)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:630)
+	at java.base/java.lang.Thread.run(Thread.java:831)
+java.lang.InterruptedException: sleep interrupted
+	at java.base/java.lang.Thread.sleep(Native Method)
+	at mao.t7.Test$1.call(Test.java:48)
+	at mao.t7.Test$1.call(Test.java:41)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:264)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1130)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:630)
+	at java.base/java.lang.Thread.run(Thread.java:831)
+java.lang.InterruptedException: sleep interrupted
+	at java.base/java.lang.Thread.sleep(Native Method)
+	at mao.t7.Test$1.call(Test.java:48)
+	at mao.t7.Test$1.call(Test.java:41)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:264)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1130)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:630)
+	at java.base/java.lang.Thread.run(Thread.java:831)
+Exception in thread "main" java.util.concurrent.CancellationException
+	at java.base/java.util.concurrent.FutureTask.report(FutureTask.java:121)
+	at java.base/java.util.concurrent.FutureTask.get(FutureTask.java:191)
+	at mao.t7.Test.main(Test.java:64)
+2022-09-09  11:43:00.680  [main] DEBUG mao.t7.Test:  结果：0
+2022-09-09  11:43:00.680  [main] DEBUG mao.t7.Test:  结果：1
+2022-09-09  11:43:00.680  [main] DEBUG mao.t7.Test:  结果：2
+2022-09-09  11:43:00.681  [main] DEBUG mao.t7.Test:  结果：3
+2022-09-09  11:43:00.681  [main] DEBUG mao.t7.Test:  结果：4
+2022-09-09  11:43:00.681  [main] DEBUG mao.t7.Test:  结果：5
+2022-09-09  11:43:00.681  [main] DEBUG mao.t7.Test:  结果：6
+2022-09-09  11:43:00.681  [main] DEBUG mao.t7.Test:  结果：7
+```
+
+
+
+
+
+
+
+#### invokeAny
+
+
+
+```java
+// 提交 tasks 中所有任务，哪个任务先成功执行完毕，返回此任务执行结果，其它任务取消
+<T> T invokeAny(Collection<? extends Callable<T>> tasks)
+ throws InterruptedException, ExecutionException;
+
+//提交 tasks 中所有任务，哪个任务先成功执行完毕，返回此任务执行结果，其它任务取消，带超时时间
+<T> T invokeAny(Collection<? extends Callable<T>> tasks,
+ long timeout, TimeUnit unit)
+ throws InterruptedException, ExecutionException, TimeoutException;
+```
+
+
+
+
+
+```java
+package mao.t8;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.*;
+
+/**
+ * Project name(项目名称)：java并发编程_线程池
+ * Package(包名): mao.t8
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/9
+ * Time(创建时间)： 11:44
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args) throws ExecutionException, InterruptedException
+    {
+        ExecutorService threadPool = Executors.newFixedThreadPool(4);
+
+        List<Callable<Integer>> tasks = new ArrayList<>();
+
+        for (int i = 0; i < 20; i++)
+        {
+            int finalI = i;
+
+            tasks.add(new Callable<Integer>()
+            {
+                @Override
+                public Integer call() throws Exception
+                {
+                    log.debug(finalI + "开始运行");
+                    try
+                    {
+                        Thread.sleep(1000);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                    return finalI;
+                }
+            });
+
+        }
+
+        //执行给定任务，返回已成功完成的任务的结果（即，不抛出异常），如果有的话。
+        //正常或异常返回时，取消未完成的任务。如果在此操作进行时修改了给定的集合，则此方法的结果是不确定的
+        Integer integer = threadPool.invokeAny(tasks);
+        log.debug("结果：" + integer);
+    }
+}
+```
+
+
+
+```sh
+2022-09-09  11:48:11.396  [pool-2-thread-3] DEBUG mao.t8.Test:  2开始运行
+2022-09-09  11:48:11.396  [pool-2-thread-1] DEBUG mao.t8.Test:  0开始运行
+2022-09-09  11:48:11.396  [pool-2-thread-2] DEBUG mao.t8.Test:  1开始运行
+2022-09-09  11:48:11.396  [pool-2-thread-4] DEBUG mao.t8.Test:  3开始运行
+2022-09-09  11:48:12.410  [pool-2-thread-4] DEBUG mao.t8.Test:  4开始运行
+2022-09-09  11:48:12.410  [pool-2-thread-3] DEBUG mao.t8.Test:  6开始运行
+2022-09-09  11:48:12.410  [pool-2-thread-1] DEBUG mao.t8.Test:  5开始运行
+2022-09-09  11:48:12.410  [pool-2-thread-2] DEBUG mao.t8.Test:  7开始运行
+2022-09-09  11:48:12.411  [main] DEBUG mao.t8.Test:  结果：2
+java.lang.InterruptedException: sleep interrupted
+	at java.base/java.lang.Thread.sleep(Native Method)
+	at mao.t8.Test$1.call(Test.java:48)
+	at mao.t8.Test$1.call(Test.java:41)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:264)
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:515)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:264)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1130)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:630)
+	at java.base/java.lang.Thread.run(Thread.java:831)
+java.lang.InterruptedException: sleep interrupted
+	at java.base/java.lang.Thread.sleep(Native Method)
+	at mao.t8.Test$1.call(Test.java:48)
+	at mao.t8.Test$1.call(Test.java:41)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:264)
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:515)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:264)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1130)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:630)
+	at java.base/java.lang.Thread.run(Thread.java:831)
+java.lang.InterruptedException: sleep interrupted
+	at java.base/java.lang.Thread.sleep(Native Method)
+	at mao.t8.Test$1.call(Test.java:48)
+	at mao.t8.Test$1.call(Test.java:41)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:264)
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:515)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:264)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1130)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:630)
+	at java.base/java.lang.Thread.run(Thread.java:831)
+java.lang.InterruptedException: sleep interrupted
+	at java.base/java.lang.Thread.sleep(Native Method)
+	at mao.t8.Test$1.call(Test.java:48)
+	at mao.t8.Test$1.call(Test.java:41)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:264)
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:515)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:264)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1130)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:630)
+	at java.base/java.lang.Thread.run(Thread.java:831)
+```
+
+
+
+
+
+
+
+### 关闭线程池
+
