@@ -18117,9 +18117,9 @@ public class ThreadPoolExecutor extends AbstractExecutorService
 
 
 
+### Executors
 
-
-### newFixedThreadPool
+#### newFixedThreadPool
 
 ```java
 
@@ -18336,7 +18336,7 @@ public class Test
 
 
 
-###  newCachedThreadPool
+####  newCachedThreadPool
 
 ```java
 
@@ -18616,7 +18616,7 @@ public class Test
 
 
 
-###  newSingleThreadExecutor
+####  newSingleThreadExecutor
 
 ```java
 
@@ -19421,4 +19421,609 @@ java.lang.InterruptedException: sleep interrupted
 
 
 ### 关闭线程池
+
+#### shutdown
+
+
+
+```java
+//线程池状态变为 SHUTDOWN
+//不会接收新任务
+//但已提交任务会执行完
+//此方法不会阻塞调用线程的执行
+void shutdown();
+```
+
+
+
+源码：
+
+```java
+
+    /**
+     * Initiates an orderly shutdown in which previously submitted
+     * tasks are executed, but no new tasks will be accepted.
+     * Invocation has no additional effect if already shut down.
+     *
+     * <p>This method does not wait for previously submitted tasks to
+     * complete execution.  Use {@link #awaitTermination awaitTermination}
+     * to do that.
+     *
+     * @throws SecurityException {@inheritDoc}
+     */
+    public void shutdown() {
+        final ReentrantLock mainLock = this.mainLock;
+        mainLock.lock();
+        try {
+            checkShutdownAccess();
+            advanceRunState(SHUTDOWN);
+            interruptIdleWorkers();
+            onShutdown(); // hook for ScheduledThreadPoolExecutor
+        } finally {
+            mainLock.unlock();
+        }
+        tryTerminate();
+    }
+```
+
+
+
+
+
+```java
+package mao.t10;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+/**
+ * Project name(项目名称)：java并发编程_线程池
+ * Package(包名): mao.t10
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/9
+ * Time(创建时间)： 12:27
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args) throws InterruptedException
+    {
+        ExecutorService threadPool = Executors.newFixedThreadPool(4);
+
+        for (int i = 0; i < 20; i++)
+        {
+            int finalI = i;
+            threadPool.submit(new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    log.debug(finalI + "开始运行");
+                    try
+                    {
+                        Thread.sleep(1000);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                    log.debug(finalI + "结束运行");
+                }
+            });
+        }
+
+        Thread.sleep(2500);
+        log.debug("开始关闭线程池");
+        //启动有序关闭，其中执行先前提交的任务，但不会接受新任务。如果已经关闭，调用没有额外的效果。
+        //此方法不等待先前提交的任务完成执行。使用awaitTermination来做到这一点
+        threadPool.shutdown();
+
+    }
+}
+```
+
+
+
+```sh
+2022-09-09  12:38:58.158  [pool-2-thread-1] DEBUG mao.t10.Test:  0开始运行
+2022-09-09  12:38:58.158  [pool-2-thread-4] DEBUG mao.t10.Test:  3开始运行
+2022-09-09  12:38:58.158  [pool-2-thread-2] DEBUG mao.t10.Test:  1开始运行
+2022-09-09  12:38:58.158  [pool-2-thread-3] DEBUG mao.t10.Test:  2开始运行
+2022-09-09  12:38:59.162  [pool-2-thread-1] DEBUG mao.t10.Test:  0结束运行
+2022-09-09  12:38:59.162  [pool-2-thread-4] DEBUG mao.t10.Test:  3结束运行
+2022-09-09  12:38:59.162  [pool-2-thread-2] DEBUG mao.t10.Test:  1结束运行
+2022-09-09  12:38:59.162  [pool-2-thread-3] DEBUG mao.t10.Test:  2结束运行
+2022-09-09  12:38:59.162  [pool-2-thread-1] DEBUG mao.t10.Test:  4开始运行
+2022-09-09  12:38:59.162  [pool-2-thread-2] DEBUG mao.t10.Test:  6开始运行
+2022-09-09  12:38:59.162  [pool-2-thread-4] DEBUG mao.t10.Test:  5开始运行
+2022-09-09  12:38:59.162  [pool-2-thread-3] DEBUG mao.t10.Test:  7开始运行
+2022-09-09  12:39:00.167  [pool-2-thread-2] DEBUG mao.t10.Test:  6结束运行
+2022-09-09  12:39:00.167  [pool-2-thread-3] DEBUG mao.t10.Test:  7结束运行
+2022-09-09  12:39:00.167  [pool-2-thread-1] DEBUG mao.t10.Test:  4结束运行
+2022-09-09  12:39:00.167  [pool-2-thread-4] DEBUG mao.t10.Test:  5结束运行
+2022-09-09  12:39:00.167  [pool-2-thread-2] DEBUG mao.t10.Test:  8开始运行
+2022-09-09  12:39:00.167  [pool-2-thread-3] DEBUG mao.t10.Test:  9开始运行
+2022-09-09  12:39:00.167  [pool-2-thread-4] DEBUG mao.t10.Test:  11开始运行
+2022-09-09  12:39:00.167  [pool-2-thread-1] DEBUG mao.t10.Test:  10开始运行
+2022-09-09  12:39:00.666  [main] DEBUG mao.t10.Test:  开始关闭线程池
+2022-09-09  12:39:01.182  [pool-2-thread-3] DEBUG mao.t10.Test:  9结束运行
+2022-09-09  12:39:01.182  [pool-2-thread-4] DEBUG mao.t10.Test:  11结束运行
+2022-09-09  12:39:01.182  [pool-2-thread-1] DEBUG mao.t10.Test:  10结束运行
+2022-09-09  12:39:01.182  [pool-2-thread-2] DEBUG mao.t10.Test:  8结束运行
+2022-09-09  12:39:01.182  [pool-2-thread-2] DEBUG mao.t10.Test:  13开始运行
+2022-09-09  12:39:01.182  [pool-2-thread-1] DEBUG mao.t10.Test:  14开始运行
+2022-09-09  12:39:01.182  [pool-2-thread-4] DEBUG mao.t10.Test:  12开始运行
+2022-09-09  12:39:01.182  [pool-2-thread-3] DEBUG mao.t10.Test:  15开始运行
+2022-09-09  12:39:02.190  [pool-2-thread-1] DEBUG mao.t10.Test:  14结束运行
+2022-09-09  12:39:02.190  [pool-2-thread-2] DEBUG mao.t10.Test:  13结束运行
+2022-09-09  12:39:02.190  [pool-2-thread-3] DEBUG mao.t10.Test:  15结束运行
+2022-09-09  12:39:02.190  [pool-2-thread-4] DEBUG mao.t10.Test:  12结束运行
+2022-09-09  12:39:02.190  [pool-2-thread-4] DEBUG mao.t10.Test:  19开始运行
+2022-09-09  12:39:02.190  [pool-2-thread-1] DEBUG mao.t10.Test:  18开始运行
+2022-09-09  12:39:02.190  [pool-2-thread-2] DEBUG mao.t10.Test:  16开始运行
+2022-09-09  12:39:02.190  [pool-2-thread-3] DEBUG mao.t10.Test:  17开始运行
+2022-09-09  12:39:03.203  [pool-2-thread-1] DEBUG mao.t10.Test:  18结束运行
+2022-09-09  12:39:03.203  [pool-2-thread-2] DEBUG mao.t10.Test:  16结束运行
+2022-09-09  12:39:03.203  [pool-2-thread-3] DEBUG mao.t10.Test:  17结束运行
+2022-09-09  12:39:03.203  [pool-2-thread-4] DEBUG mao.t10.Test:  19结束运行
+```
+
+
+
+
+
+```java
+package mao.t11;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
+
+/**
+ * Project name(项目名称)：java并发编程_线程池
+ * Package(包名): mao.t11
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/9
+ * Time(创建时间)： 12:42
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args) throws InterruptedException
+    {
+        ExecutorService threadPool = Executors.newFixedThreadPool(4);
+
+        for (int i = 0; i < 20; i++)
+        {
+            int finalI = i;
+            threadPool.submit(new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    log.debug(finalI + "开始运行");
+                    try
+                    {
+                        Thread.sleep(1000);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                    log.debug(finalI + "结束运行");
+                }
+            });
+        }
+
+        Thread.sleep(2500);
+        log.debug("开始关闭线程池");
+        //启动有序关闭，其中执行先前提交的任务，但不会接受新任务。如果已经关闭，调用没有额外的效果。
+        //此方法不等待先前提交的任务完成执行。使用awaitTermination来做到这一点
+        threadPool.shutdown();
+
+
+        for (int i = 20; i < 23; i++)
+        {
+            try
+            {
+                int finalI = i;
+                threadPool.submit(new Runnable()
+                {
+                    @Override
+                    public void run()
+                    {
+                        log.debug(finalI + "开始运行");
+                        try
+                        {
+                            Thread.sleep(1000);
+                        }
+                        catch (InterruptedException e)
+                        {
+                            e.printStackTrace();
+                        }
+                        log.debug(finalI + "结束运行");
+                    }
+                });
+            }
+            catch (RejectedExecutionException e)
+            {
+                e.printStackTrace();
+            }
+        }
+    }
+}
+```
+
+
+
+```sh
+2022-09-09  12:45:02.096  [pool-2-thread-2] DEBUG mao.t11.Test:  1开始运行
+2022-09-09  12:45:02.096  [pool-2-thread-4] DEBUG mao.t11.Test:  3开始运行
+2022-09-09  12:45:02.096  [pool-2-thread-3] DEBUG mao.t11.Test:  2开始运行
+2022-09-09  12:45:02.096  [pool-2-thread-1] DEBUG mao.t11.Test:  0开始运行
+2022-09-09  12:45:03.108  [pool-2-thread-4] DEBUG mao.t11.Test:  3结束运行
+2022-09-09  12:45:03.108  [pool-2-thread-3] DEBUG mao.t11.Test:  2结束运行
+2022-09-09  12:45:03.108  [pool-2-thread-2] DEBUG mao.t11.Test:  1结束运行
+2022-09-09  12:45:03.108  [pool-2-thread-1] DEBUG mao.t11.Test:  0结束运行
+2022-09-09  12:45:03.108  [pool-2-thread-4] DEBUG mao.t11.Test:  4开始运行
+2022-09-09  12:45:03.108  [pool-2-thread-1] DEBUG mao.t11.Test:  6开始运行
+2022-09-09  12:45:03.108  [pool-2-thread-2] DEBUG mao.t11.Test:  5开始运行
+2022-09-09  12:45:03.108  [pool-2-thread-3] DEBUG mao.t11.Test:  7开始运行
+2022-09-09  12:45:04.111  [pool-2-thread-3] DEBUG mao.t11.Test:  7结束运行
+2022-09-09  12:45:04.111  [pool-2-thread-4] DEBUG mao.t11.Test:  4结束运行
+2022-09-09  12:45:04.111  [pool-2-thread-2] DEBUG mao.t11.Test:  5结束运行
+2022-09-09  12:45:04.111  [pool-2-thread-1] DEBUG mao.t11.Test:  6结束运行
+2022-09-09  12:45:04.111  [pool-2-thread-2] DEBUG mao.t11.Test:  9开始运行
+2022-09-09  12:45:04.111  [pool-2-thread-3] DEBUG mao.t11.Test:  8开始运行
+2022-09-09  12:45:04.111  [pool-2-thread-1] DEBUG mao.t11.Test:  11开始运行
+2022-09-09  12:45:04.111  [pool-2-thread-4] DEBUG mao.t11.Test:  10开始运行
+2022-09-09  12:45:04.596  [main] DEBUG mao.t11.Test:  开始关闭线程池
+java.util.concurrent.RejectedExecutionException: Task java.util.concurrent.FutureTask@47987356[Not completed, task = java.util.concurrent.Executors$RunnableAdapter@35aea049[Wrapped task = mao.t11.Test$2@7205765b]] rejected from java.util.concurrent.ThreadPoolExecutor@22ef9844[Shutting down, pool size = 4, active threads = 4, queued tasks = 8, completed tasks = 8]
+	at java.base/java.util.concurrent.ThreadPoolExecutor$AbortPolicy.rejectedExecution(ThreadPoolExecutor.java:2057)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.reject(ThreadPoolExecutor.java:827)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.execute(ThreadPoolExecutor.java:1357)
+	at java.base/java.util.concurrent.AbstractExecutorService.submit(AbstractExecutorService.java:123)
+	at mao.t11.Test.main(Test.java:68)
+java.util.concurrent.RejectedExecutionException: Task java.util.concurrent.FutureTask@2f217633[Not completed, task = java.util.concurrent.Executors$RunnableAdapter@1da2cb77[Wrapped task = mao.t11.Test$2@48f278eb]] rejected from java.util.concurrent.ThreadPoolExecutor@22ef9844[Shutting down, pool size = 4, active threads = 4, queued tasks = 8, completed tasks = 8]
+	at java.base/java.util.concurrent.ThreadPoolExecutor$AbortPolicy.rejectedExecution(ThreadPoolExecutor.java:2057)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.reject(ThreadPoolExecutor.java:827)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.execute(ThreadPoolExecutor.java:1357)
+	at java.base/java.util.concurrent.AbstractExecutorService.submit(AbstractExecutorService.java:123)
+	at mao.t11.Test.main(Test.java:68)
+java.util.concurrent.RejectedExecutionException: Task java.util.concurrent.FutureTask@7e7be63f[Not completed, task = java.util.concurrent.Executors$RunnableAdapter@1a18644[Wrapped task = mao.t11.Test$2@5acf93bb]] rejected from java.util.concurrent.ThreadPoolExecutor@22ef9844[Shutting down, pool size = 4, active threads = 4, queued tasks = 8, completed tasks = 8]
+	at java.base/java.util.concurrent.ThreadPoolExecutor$AbortPolicy.rejectedExecution(ThreadPoolExecutor.java:2057)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.reject(ThreadPoolExecutor.java:827)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.execute(ThreadPoolExecutor.java:1357)
+	at java.base/java.util.concurrent.AbstractExecutorService.submit(AbstractExecutorService.java:123)
+	at mao.t11.Test.main(Test.java:68)
+2022-09-09  12:45:05.125  [pool-2-thread-4] DEBUG mao.t11.Test:  10结束运行
+2022-09-09  12:45:05.125  [pool-2-thread-3] DEBUG mao.t11.Test:  8结束运行
+2022-09-09  12:45:05.125  [pool-2-thread-1] DEBUG mao.t11.Test:  11结束运行
+2022-09-09  12:45:05.125  [pool-2-thread-2] DEBUG mao.t11.Test:  9结束运行
+2022-09-09  12:45:05.125  [pool-2-thread-3] DEBUG mao.t11.Test:  12开始运行
+2022-09-09  12:45:05.125  [pool-2-thread-1] DEBUG mao.t11.Test:  13开始运行
+2022-09-09  12:45:05.125  [pool-2-thread-2] DEBUG mao.t11.Test:  14开始运行
+2022-09-09  12:45:05.125  [pool-2-thread-4] DEBUG mao.t11.Test:  15开始运行
+2022-09-09  12:45:06.127  [pool-2-thread-2] DEBUG mao.t11.Test:  14结束运行
+2022-09-09  12:45:06.127  [pool-2-thread-1] DEBUG mao.t11.Test:  13结束运行
+2022-09-09  12:45:06.127  [pool-2-thread-4] DEBUG mao.t11.Test:  15结束运行
+2022-09-09  12:45:06.127  [pool-2-thread-3] DEBUG mao.t11.Test:  12结束运行
+2022-09-09  12:45:06.127  [pool-2-thread-2] DEBUG mao.t11.Test:  16开始运行
+2022-09-09  12:45:06.127  [pool-2-thread-1] DEBUG mao.t11.Test:  17开始运行
+2022-09-09  12:45:06.127  [pool-2-thread-4] DEBUG mao.t11.Test:  18开始运行
+2022-09-09  12:45:06.127  [pool-2-thread-3] DEBUG mao.t11.Test:  19开始运行
+2022-09-09  12:45:07.130  [pool-2-thread-3] DEBUG mao.t11.Test:  19结束运行
+2022-09-09  12:45:07.130  [pool-2-thread-2] DEBUG mao.t11.Test:  16结束运行
+2022-09-09  12:45:07.130  [pool-2-thread-4] DEBUG mao.t11.Test:  18结束运行
+2022-09-09  12:45:07.130  [pool-2-thread-1] DEBUG mao.t11.Test:  17结束运行
+```
+
+
+
+
+
+
+
+#### shutdownNow
+
+
+
+```java
+//线程池状态变为 STOP
+//不会接收新任务
+//会将队列中的任务返回
+//并用 interrupt 的方式中断正在执行的任务
+List<Runnable> shutdownNow();
+```
+
+
+
+源码：
+
+```java
+
+    /**
+     * Attempts to stop all actively executing tasks, halts the
+     * processing of waiting tasks, and returns a list of the tasks
+     * that were awaiting execution. These tasks are drained (removed)
+     * from the task queue upon return from this method.
+     *
+     * <p>This method does not wait for actively executing tasks to
+     * terminate.  Use {@link #awaitTermination awaitTermination} to
+     * do that.
+     *
+     * <p>There are no guarantees beyond best-effort attempts to stop
+     * processing actively executing tasks.  This implementation
+     * interrupts tasks via {@link Thread#interrupt}; any task that
+     * fails to respond to interrupts may never terminate.
+     *
+     * @throws SecurityException {@inheritDoc}
+     */
+    public List<Runnable> shutdownNow() {
+        List<Runnable> tasks;
+        final ReentrantLock mainLock = this.mainLock;
+        mainLock.lock();
+        try {
+            checkShutdownAccess();
+            advanceRunState(STOP);
+            interruptWorkers();
+            tasks = drainQueue();
+        } finally {
+            mainLock.unlock();
+        }
+        tryTerminate();
+        return tasks;
+    }
+```
+
+
+
+
+
+```java
+package mao.t12;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
+
+/**
+ * Project name(项目名称)：java并发编程_线程池
+ * Package(包名): mao.t12
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/9
+ * Time(创建时间)： 12:47
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args) throws InterruptedException
+    {
+        ExecutorService threadPool = Executors.newFixedThreadPool(4);
+
+        for (int i = 0; i < 20; i++)
+        {
+            int finalI = i;
+            threadPool.submit(new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    log.debug(finalI + "开始运行");
+                    try
+                    {
+                        Thread.sleep(1000);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                    log.debug(finalI + "结束运行");
+                }
+            });
+        }
+
+        Thread.sleep(2500);
+        log.debug("开始关闭线程池");
+        //尝试停止所有正在执行的任务，停止等待任务的处理，并返回等待执行的任务列表。
+        //此方法不等待主动执行的任务终止。使用awaitTermination来做到这一点。
+        //除了尽最大努力停止处理正在执行的任务之外，没有任何保证。
+        //例如，典型的实现将通过Thread.interrupt取消，因此任何未能响应中断的任务可能永远不会终止。
+        List<Runnable> runnableList = threadPool.shutdownNow();
+
+        for (int i = 20; i < 23; i++)
+        {
+            try
+            {
+                int finalI = i;
+                threadPool.submit(new Runnable()
+                {
+                    @Override
+                    public void run()
+                    {
+                        log.debug(finalI + "开始运行");
+                        try
+                        {
+                            Thread.sleep(1000);
+                        }
+                        catch (InterruptedException e)
+                        {
+                            e.printStackTrace();
+                        }
+                        log.debug(finalI + "结束运行");
+                    }
+                });
+            }
+            catch (RejectedExecutionException e)
+            {
+                e.printStackTrace();
+            }
+        }
+        
+        Thread.sleep(500);
+
+        for (Runnable runnable : runnableList)
+        {
+            log.warn("未执行完成的任务：" + runnable);
+        }
+    }
+}
+```
+
+
+
+```sh
+2022-09-09  12:52:47.300  [pool-2-thread-4] DEBUG mao.t12.Test:  3开始运行
+2022-09-09  12:52:47.300  [pool-2-thread-3] DEBUG mao.t12.Test:  2开始运行
+2022-09-09  12:52:47.300  [pool-2-thread-1] DEBUG mao.t12.Test:  0开始运行
+2022-09-09  12:52:47.300  [pool-2-thread-2] DEBUG mao.t12.Test:  1开始运行
+2022-09-09  12:52:48.306  [pool-2-thread-1] DEBUG mao.t12.Test:  0结束运行
+2022-09-09  12:52:48.306  [pool-2-thread-4] DEBUG mao.t12.Test:  3结束运行
+2022-09-09  12:52:48.306  [pool-2-thread-3] DEBUG mao.t12.Test:  2结束运行
+2022-09-09  12:52:48.306  [pool-2-thread-2] DEBUG mao.t12.Test:  1结束运行
+2022-09-09  12:52:48.306  [pool-2-thread-1] DEBUG mao.t12.Test:  5开始运行
+2022-09-09  12:52:48.306  [pool-2-thread-2] DEBUG mao.t12.Test:  4开始运行
+2022-09-09  12:52:48.306  [pool-2-thread-3] DEBUG mao.t12.Test:  6开始运行
+2022-09-09  12:52:48.307  [pool-2-thread-4] DEBUG mao.t12.Test:  7开始运行
+2022-09-09  12:52:49.307  [pool-2-thread-1] DEBUG mao.t12.Test:  5结束运行
+2022-09-09  12:52:49.307  [pool-2-thread-1] DEBUG mao.t12.Test:  8开始运行
+2022-09-09  12:52:49.311  [pool-2-thread-3] DEBUG mao.t12.Test:  6结束运行
+2022-09-09  12:52:49.311  [pool-2-thread-2] DEBUG mao.t12.Test:  4结束运行
+2022-09-09  12:52:49.311  [pool-2-thread-3] DEBUG mao.t12.Test:  9开始运行
+2022-09-09  12:52:49.311  [pool-2-thread-4] DEBUG mao.t12.Test:  7结束运行
+2022-09-09  12:52:49.311  [pool-2-thread-2] DEBUG mao.t12.Test:  10开始运行
+2022-09-09  12:52:49.311  [pool-2-thread-4] DEBUG mao.t12.Test:  11开始运行
+2022-09-09  12:52:49.798  [main] DEBUG mao.t12.Test:  开始关闭线程池
+2022-09-09  12:52:49.799  [pool-2-thread-1] DEBUG mao.t12.Test:  8结束运行
+2022-09-09  12:52:49.799  [pool-2-thread-4] DEBUG mao.t12.Test:  11结束运行
+2022-09-09  12:52:49.799  [pool-2-thread-2] DEBUG mao.t12.Test:  10结束运行
+2022-09-09  12:52:49.799  [pool-2-thread-3] DEBUG mao.t12.Test:  9结束运行
+java.lang.InterruptedException: sleep interrupted
+	at java.base/java.lang.Thread.sleep(Native Method)
+	at mao.t12.Test$1.run(Test.java:46)
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:515)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:264)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1130)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:630)
+	at java.base/java.lang.Thread.run(Thread.java:831)
+java.util.concurrent.RejectedExecutionException: Task java.util.concurrent.FutureTask@47987356[Not completed, task = java.util.concurrent.Executors$RunnableAdapter@35aea049[Wrapped task = mao.t12.Test$2@7205765b]] rejected from java.util.concurrent.ThreadPoolExecutor@22ef9844[Shutting down, pool size = 4, active threads = 4, queued tasks = 0, completed tasks = 8]
+	at java.base/java.util.concurrent.ThreadPoolExecutor$AbortPolicy.rejectedExecution(ThreadPoolExecutor.java:2057)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.reject(ThreadPoolExecutor.java:827)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.execute(ThreadPoolExecutor.java:1357)
+	at java.base/java.util.concurrent.AbstractExecutorService.submit(AbstractExecutorService.java:123)
+	at mao.t12.Test.main(Test.java:70)
+java.lang.InterruptedException: sleep interrupted
+	at java.base/java.lang.Thread.sleep(Native Method)
+	at mao.t12.Test$1.run(Test.java:46)
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:515)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:264)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1130)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:630)
+	at java.base/java.lang.Thread.run(Thread.java:831)
+java.lang.InterruptedException: sleep interrupted
+	at java.base/java.lang.Thread.sleep(Native Method)
+	at mao.t12.Test$1.run(Test.java:46)
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:515)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:264)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1130)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:630)
+	at java.base/java.lang.Thread.run(Thread.java:831)
+java.lang.InterruptedException: sleep interrupted
+	at java.base/java.lang.Thread.sleep(Native Method)
+	at mao.t12.Test$1.run(Test.java:46)
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:515)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:264)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1130)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:630)
+	at java.base/java.lang.Thread.run(Thread.java:831)
+java.util.concurrent.RejectedExecutionException: Task java.util.concurrent.FutureTask@611889f4[Not completed, task = java.util.concurrent.Executors$RunnableAdapter@3b6ddd1d[Wrapped task = mao.t12.Test$2@3f6b0be5]] rejected from java.util.concurrent.ThreadPoolExecutor@22ef9844[Shutting down, pool size = 3, active threads = 3, queued tasks = 0, completed tasks = 9]
+	at java.base/java.util.concurrent.ThreadPoolExecutor$AbortPolicy.rejectedExecution(ThreadPoolExecutor.java:2057)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.reject(ThreadPoolExecutor.java:827)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.execute(ThreadPoolExecutor.java:1357)
+	at java.base/java.util.concurrent.AbstractExecutorService.submit(AbstractExecutorService.java:123)
+	at mao.t12.Test.main(Test.java:70)
+java.util.concurrent.RejectedExecutionException: Task java.util.concurrent.FutureTask@a530d0a[Not completed, task = java.util.concurrent.Executors$RunnableAdapter@48f278eb[Wrapped task = mao.t12.Test$2@2f217633]] rejected from java.util.concurrent.ThreadPoolExecutor@22ef9844[Terminated, pool size = 0, active threads = 0, queued tasks = 0, completed tasks = 12]
+	at java.base/java.util.concurrent.ThreadPoolExecutor$AbortPolicy.rejectedExecution(ThreadPoolExecutor.java:2057)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.reject(ThreadPoolExecutor.java:827)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.execute(ThreadPoolExecutor.java:1357)
+	at java.base/java.util.concurrent.AbstractExecutorService.submit(AbstractExecutorService.java:123)
+	at mao.t12.Test.main(Test.java:70)
+2022-09-09  12:52:50.301  [main] WARN  mao.t12.Test:  未执行完成的任务：java.util.concurrent.FutureTask@6cd28fa7[Not completed, task = java.util.concurrent.Executors$RunnableAdapter@5acf93bb[Wrapped task = mao.t12.Test$1@7e7be63f]]
+2022-09-09  12:52:50.301  [main] WARN  mao.t12.Test:  未执行完成的任务：java.util.concurrent.FutureTask@66d3eec0[Not completed, task = java.util.concurrent.Executors$RunnableAdapter@614ca7df[Wrapped task = mao.t12.Test$1@4738a206]]
+2022-09-09  12:52:50.301  [main] WARN  mao.t12.Test:  未执行完成的任务：java.util.concurrent.FutureTask@18d87d80[Not completed, task = java.util.concurrent.Executors$RunnableAdapter@1e04fa0a[Wrapped task = mao.t12.Test$1@1af2d44a]]
+2022-09-09  12:52:50.301  [main] WARN  mao.t12.Test:  未执行完成的任务：java.util.concurrent.FutureTask@543588e6[Not completed, task = java.util.concurrent.Executors$RunnableAdapter@618425b5[Wrapped task = mao.t12.Test$1@58695725]]
+2022-09-09  12:52:50.301  [main] WARN  mao.t12.Test:  未执行完成的任务：java.util.concurrent.FutureTask@5d7148e2[Not completed, task = java.util.concurrent.Executors$RunnableAdapter@f5acb9d[Wrapped task = mao.t12.Test$1@4fb3ee4e]]
+2022-09-09  12:52:50.301  [main] WARN  mao.t12.Test:  未执行完成的任务：java.util.concurrent.FutureTask@2c35e847[Not completed, task = java.util.concurrent.Executors$RunnableAdapter@25fb8912[Wrapped task = mao.t12.Test$1@7c24b813]]
+2022-09-09  12:52:50.302  [main] WARN  mao.t12.Test:  未执行完成的任务：java.util.concurrent.FutureTask@5ba3f27a[Not completed, task = java.util.concurrent.Executors$RunnableAdapter@7bd4937b[Wrapped task = mao.t12.Test$1@21e360a]]
+2022-09-09  12:52:50.302  [main] WARN  mao.t12.Test:  未执行完成的任务：java.util.concurrent.FutureTask@741a8937[Not completed, task = java.util.concurrent.Executors$RunnableAdapter@58d75e99[Wrapped task = mao.t12.Test$1@74751b3]]
+```
+
+
+
+
+
+### 其它方法
+
+
+
+```java
+// 不在 RUNNING 状态的线程池，此方法就返回 true
+boolean isShutdown();
+
+// 线程池状态是否是 TERMINATED
+boolean isTerminated();
+
+// 调用 shutdown 后，由于调用线程并不会等待所有任务运行结束，因此如果它想在线程池 TERMINATED 后做些事情，可以利用此方法等待
+boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException;
+```
+
+
+
+
+
+
+
+
+
+### 异步模式之工作线程
 
