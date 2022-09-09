@@ -18085,5 +18085,294 @@ public class ThreadPoolExecutor extends AbstractExecutorService
 
 
 
+* 线程池中刚开始没有线程，当一个任务提交给线程池后，线程池会创建一个新线程来执行任务
+* 当线程数达到 corePoolSize 并没有线程空闲，这时再加入任务，新加的任务会被加入workQueue 队列排 队，直到有空闲的线程
+* 如果队列选择了有界队列，那么任务超过了队列大小时，会创建 maximumPoolSize - corePoolSize 数目的线 程来救急
+* 如果线程到达 maximumPoolSize 仍然有新任务这时会执行拒绝策略。拒绝策略 jdk 提供了 4 种实现，其它 著名框架也提供了实现
+  * AbortPolicy 让调用者抛出 RejectedExecutionException 异常，这是默认策略
+  * CallerRunsPolicy 让调用者运行任务
+  * DiscardPolicy 放弃本次任务
+  * DiscardOldestPolicy 放弃队列中最早的任务，本任务取而代之
+  * Dubbo 的实现，在抛出 RejectedExecutionException 异常之前会记录日志，并 dump 线程栈信息，方便定位问题
+  * Netty 的实现，是创建一个新线程来执行任务
+  * ActiveMQ 的实现，带超时等待（60s）尝试放入队列，类似我们之前自定义的拒绝策略
+  * PinPoint 的实现，它使用了一个拒绝策略链，会逐一尝试策略链中每种拒绝策略
+* 当高峰过去后，超过corePoolSize 的救急线程如果一段时间没有任务做，需要结束节省资源，这个时间由 keepAliveTime 和 unit 来控制
+
+
+
+![image-20220908213146748](img/java并发编程学习笔记/image-20220908213146748.png)
+
+
+
+
+
+根据这个构造方法，JDK Executors 类中提供了众多工厂方法来创建各种用途的线程池
+
+* newFixedThreadPool
+* newCachedThreadPool
+* newSingleThreadExecutor
+
+
+
+
+
+
+
+### newFixedThreadPool
+
+```java
+
+    /**
+     * Creates a thread pool that reuses a fixed number of threads
+     * operating off a shared unbounded queue.  At any point, at most
+     * {@code nThreads} threads will be active processing tasks.
+     * If additional tasks are submitted when all threads are active,
+     * they will wait in the queue until a thread is available.
+     * If any thread terminates due to a failure during execution
+     * prior to shutdown, a new one will take its place if needed to
+     * execute subsequent tasks.  The threads in the pool will exist
+     * until it is explicitly {@link ExecutorService#shutdown shutdown}.
+     *
+     * @param nThreads the number of threads in the pool
+     * @return the newly created thread pool
+     * @throws IllegalArgumentException if {@code nThreads <= 0}
+     */
+    public static ExecutorService newFixedThreadPool(int nThreads) {
+        return new ThreadPoolExecutor(nThreads, nThreads,
+                                      0L, TimeUnit.MILLISECONDS,
+                                      new LinkedBlockingQueue<Runnable>());
+    }
+```
+
+
+
+* 核心线程数 == 最大线程数（没有救急线程被创建），因此也无需超时时间
+* 阻塞队列是无界的，可以放任意数量的任务
+
+
+
+适用于任务量已知，相对耗时的任务
+
+
+
+```java
+package mao.t1;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+/**
+ * Project name(项目名称)：java并发编程_线程池
+ * Package(包名): mao.t1
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/9
+ * Time(创建时间)： 10:23
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args)
+    {
+        ExecutorService threadPool = Executors.newFixedThreadPool(4);
+
+        for (int i = 0; i < 20; i++)
+        {
+            int finalI = i;
+            threadPool.submit(new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    log.debug(finalI + "开始运行");
+                    try
+                    {
+                        Thread.sleep(1000);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                    //log.debug(finalI + "结束运行");
+                }
+            });
+        }
+
+
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-09  11:02:24.327  [pool-2-thread-1] DEBUG mao.t1.Test:  0开始运行
+2022-09-09  11:02:24.327  [pool-2-thread-4] DEBUG mao.t1.Test:  3开始运行
+2022-09-09  11:02:24.327  [pool-2-thread-3] DEBUG mao.t1.Test:  2开始运行
+2022-09-09  11:02:24.327  [pool-2-thread-2] DEBUG mao.t1.Test:  1开始运行
+2022-09-09  11:02:25.344  [pool-2-thread-2] DEBUG mao.t1.Test:  4开始运行
+2022-09-09  11:02:25.344  [pool-2-thread-3] DEBUG mao.t1.Test:  5开始运行
+2022-09-09  11:02:25.344  [pool-2-thread-4] DEBUG mao.t1.Test:  6开始运行
+2022-09-09  11:02:25.344  [pool-2-thread-1] DEBUG mao.t1.Test:  7开始运行
+2022-09-09  11:02:26.356  [pool-2-thread-3] DEBUG mao.t1.Test:  10开始运行
+2022-09-09  11:02:26.356  [pool-2-thread-2] DEBUG mao.t1.Test:  8开始运行
+2022-09-09  11:02:26.356  [pool-2-thread-4] DEBUG mao.t1.Test:  9开始运行
+2022-09-09  11:02:26.356  [pool-2-thread-1] DEBUG mao.t1.Test:  11开始运行
+2022-09-09  11:02:27.363  [pool-2-thread-2] DEBUG mao.t1.Test:  12开始运行
+2022-09-09  11:02:27.363  [pool-2-thread-1] DEBUG mao.t1.Test:  13开始运行
+2022-09-09  11:02:27.363  [pool-2-thread-4] DEBUG mao.t1.Test:  14开始运行
+2022-09-09  11:02:27.363  [pool-2-thread-3] DEBUG mao.t1.Test:  15开始运行
+2022-09-09  11:02:28.364  [pool-2-thread-1] DEBUG mao.t1.Test:  16开始运行
+2022-09-09  11:02:28.364  [pool-2-thread-4] DEBUG mao.t1.Test:  18开始运行
+2022-09-09  11:02:28.364  [pool-2-thread-3] DEBUG mao.t1.Test:  17开始运行
+2022-09-09  11:02:28.364  [pool-2-thread-2] DEBUG mao.t1.Test:  19开始运行
+```
+
+
+
+更改线程数
+
+```java
+package mao.t1;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+/**
+ * Project name(项目名称)：java并发编程_线程池
+ * Package(包名): mao.t1
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/9
+ * Time(创建时间)： 10:23
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args)
+    {
+        ExecutorService threadPool = Executors.newFixedThreadPool(8);
+
+        for (int i = 0; i < 20; i++)
+        {
+            int finalI = i;
+            threadPool.submit(new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    log.debug(finalI + "开始运行");
+                    try
+                    {
+                        Thread.sleep(1000);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                    //log.debug(finalI + "结束运行");
+                }
+            });
+        }
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-09  11:04:08.120  [pool-2-thread-6] DEBUG mao.t1.Test:  5开始运行
+2022-09-09  11:04:08.120  [pool-2-thread-8] DEBUG mao.t1.Test:  7开始运行
+2022-09-09  11:04:08.120  [pool-2-thread-5] DEBUG mao.t1.Test:  4开始运行
+2022-09-09  11:04:08.120  [pool-2-thread-4] DEBUG mao.t1.Test:  3开始运行
+2022-09-09  11:04:08.120  [pool-2-thread-1] DEBUG mao.t1.Test:  0开始运行
+2022-09-09  11:04:08.120  [pool-2-thread-3] DEBUG mao.t1.Test:  2开始运行
+2022-09-09  11:04:08.120  [pool-2-thread-2] DEBUG mao.t1.Test:  1开始运行
+2022-09-09  11:04:08.120  [pool-2-thread-7] DEBUG mao.t1.Test:  6开始运行
+2022-09-09  11:04:09.123  [pool-2-thread-5] DEBUG mao.t1.Test:  9开始运行
+2022-09-09  11:04:09.123  [pool-2-thread-3] DEBUG mao.t1.Test:  8开始运行
+2022-09-09  11:04:09.123  [pool-2-thread-1] DEBUG mao.t1.Test:  11开始运行
+2022-09-09  11:04:09.123  [pool-2-thread-4] DEBUG mao.t1.Test:  10开始运行
+2022-09-09  11:04:09.124  [pool-2-thread-8] DEBUG mao.t1.Test:  12开始运行
+2022-09-09  11:04:09.127  [pool-2-thread-2] DEBUG mao.t1.Test:  13开始运行
+2022-09-09  11:04:09.127  [pool-2-thread-7] DEBUG mao.t1.Test:  14开始运行
+2022-09-09  11:04:09.127  [pool-2-thread-6] DEBUG mao.t1.Test:  15开始运行
+2022-09-09  11:04:10.124  [pool-2-thread-1] DEBUG mao.t1.Test:  16开始运行
+2022-09-09  11:04:10.124  [pool-2-thread-5] DEBUG mao.t1.Test:  17开始运行
+2022-09-09  11:04:10.126  [pool-2-thread-4] DEBUG mao.t1.Test:  18开始运行
+2022-09-09  11:04:10.126  [pool-2-thread-3] DEBUG mao.t1.Test:  19开始运行
+```
+
+
+
+
+
+###  newCachedThreadPool
+
+```java
+
+    /**
+     * Creates a thread pool that creates new threads as needed, but
+     * will reuse previously constructed threads when they are
+     * available.  These pools will typically improve the performance
+     * of programs that execute many short-lived asynchronous tasks.
+     * Calls to {@code execute} will reuse previously constructed
+     * threads if available. If no existing thread is available, a new
+     * thread will be created and added to the pool. Threads that have
+     * not been used for sixty seconds are terminated and removed from
+     * the cache. Thus, a pool that remains idle for long enough will
+     * not consume any resources. Note that pools with similar
+     * properties but different details (for example, timeout parameters)
+     * may be created using {@link ThreadPoolExecutor} constructors.
+     *
+     * @return the newly created thread pool
+     */
+    public static ExecutorService newCachedThreadPool() {
+        return new ThreadPoolExecutor(0, Integer.MAX_VALUE,
+                                      60L, TimeUnit.SECONDS,
+                                      new SynchronousQueue<Runnable>());
+    }
+```
+
+
+
+* 核心线程数是 0， 最大线程数是 Integer.MAX_VALUE，救急线程的空闲生存时间是 60s，意味着
+  * 全部都是救急线程（60s 后可以回收）
+  * 救急线程可以无限创建
+* 队列采用了 SynchronousQueue 实现特点是，它没有容量，没有线程来取是放不进去的
+
+
+
+
+
 
 
