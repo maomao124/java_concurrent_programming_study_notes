@@ -21349,3 +21349,156 @@ Caused by: java.lang.ArithmeticException: / by zero
 
 ### 定时任务
 
+```java
+package mao.t1;
+
+import java.time.DayOfWeek;
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * Project name(项目名称)：java并发编程_定时任务
+ * Package(包名): mao.t1
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/10
+ * Time(创建时间)： 12:29
+ * Version(版本): 1.0
+ * Description(描述)： 何让每周四 18:00:00 定时执行任务
+ */
+
+public class Test
+{
+    public static void main(String[] args)
+    {
+        //当前时间
+        LocalDateTime now = LocalDateTime.now();
+        //这周周四 18:00:00的时间
+        LocalDateTime thursday = now.with(DayOfWeek.THURSDAY).withHour(18).withMinute(0).withSecond(0).withNano(0);
+        //判断当前时间是否已经超过了本周的星期四的18:00:00
+        if (now.isAfter(thursday))
+        {
+            //下一周
+            thursday = thursday.plusWeeks(1);
+        }
+        //计算时间差，即延时执行时间
+        long initialDelay = Duration.between(now, thursday).toMillis();
+        //一周的时间间隔
+        long oneWeek = 7 * 24 * 3600 * 1000;
+        ScheduledExecutorService threadPool = Executors.newScheduledThreadPool(2);
+        threadPool.scheduleAtFixedRate(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                System.out.println("运行");
+            }
+        }, initialDelay, oneWeek, TimeUnit.MILLISECONDS);
+    }
+}
+```
+
+
+
+
+
+
+
+###  Tomcat 线程池
+
+* LimitLatch 用来限流，可以控制最大连接个数
+* Acceptor 只负责接收新的 socket 连接
+* Poller 只负责监听 socket channel 是否有可读的 I/O 事件
+* 一旦可读，封装一个任务对象（socketProcessor），提交给 Executor 线程池处理
+* Executor 线程池中的工作线程最终负责处理请求
+
+
+
+Tomcat 线程池扩展了 ThreadPoolExecutor，行为稍有不同
+
+* 如果总线程数达到 maximumPoolSize
+  * 这时不会立刻抛 RejectedExecutionException 异常
+  * 而是再次尝试将任务放入队列，如果还失败，才抛出 RejectedExecutionException 异常
+
+
+
+
+
+```java
+/**
+ * 执行
+ *
+ * @param command 命令
+ * @param timeout 超时
+ * @param unit    单位
+ */
+public void execute(Runnable command, long timeout, TimeUnit unit)
+{
+    submittedCount.incrementAndGet();
+    try
+    {
+        super.execute(command);
+    }
+    catch (RejectedExecutionException rx)
+    {
+        if (super.getQueue() instanceof TaskQueue)
+        {
+            final TaskQueue queue = (TaskQueue) super.getQueue();
+            try
+            {
+                if (!queue.force(command, timeout, unit))
+                {
+                    submittedCount.decrementAndGet();
+                    throw new RejectedExecutionException("Queue capacity is full.");
+                }
+            }
+            catch (InterruptedException x)
+            {
+                submittedCount.decrementAndGet();
+                Thread.interrupted();
+                throw new RejectedExecutionException(x);
+            }
+        }
+        else
+        {
+            submittedCount.decrementAndGet();
+            throw rx;
+        }
+    }
+
+
+}
+```
+
+
+
+
+
+```java
+ public boolean force(Runnable o, long timeout, TimeUnit unit) throws InterruptedException
+    {
+        if (parent.isShutdown())
+        {
+            throw new RejectedExecutionException(
+                    "Executor not running, can't force a command into the queue"
+            );
+        }
+        return super.offer(o, timeout, unit); //forces the item onto the queue, to be used if the task is rejected
+    }
+```
+
+
+
+
+
+
+
+
+
+### Fork/Join
+
