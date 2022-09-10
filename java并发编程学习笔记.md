@@ -21502,3 +21502,326 @@ public void execute(Runnable command, long timeout, TimeUnit unit)
 
 ### Fork/Join
 
+#### 概念
+
+Fork/Join 是 JDK 1.7 加入的新的线程池实现，它体现的是一种分治思想，适用于能够进行任务拆分的 cpu 密集型运算 
+
+所谓的任务拆分，是将一个大任务拆分为算法上相同的小任务，直至不能拆分可以直接求解。跟递归相关的一些计 算，如归并排序、斐波那契数列、都可以用分治思想进行求解
+
+Fork/Join 在分治的基础上加入了多线程，可以把每个任务的分解和合并交给不同的线程来完成，进一步提升了运算效率
+
+Fork/Join 默认会创建与 cpu 核心数大小相同的线程池
+
+
+
+
+
+```java
+package mao.t1;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.RecursiveTask;
+
+/**
+ * Project name(项目名称)：java并发编程_Fork_Join
+ * Package(包名): mao.t1
+ * Class(类名): AddTask
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/10
+ * Time(创建时间)： 13:07
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class AddTask extends RecursiveTask<Integer>
+{
+
+    private final int n;
+
+    private static final Logger log = LoggerFactory.getLogger(AddTask.class);
+
+    public AddTask(int n)
+    {
+        this.n = n;
+    }
+
+    @Override
+    public String toString()
+    {
+        return "{" + n + '}';
+    }
+
+    @Override
+    protected Integer compute()
+    {
+        if (n == 1)
+        {
+            log.debug("join " + n);
+            return n;
+        }
+        //不为1
+        //拆分
+        AddTask t1 = new AddTask(n - 1);
+        t1.fork();
+        log.debug("fork " + n + " " + t1);
+
+        //合并
+        Integer result = t1.join() + n;
+        log.debug("join " + n + " " + t1 + " " + result);
+        //返回
+        return result;
+    }
+}
+```
+
+
+
+```java
+package mao.t1;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.ForkJoinPool;
+
+/**
+ * Project name(项目名称)：java并发编程_Fork_Join
+ * Package(包名): mao.t1
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/10
+ * Time(创建时间)： 13:00
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args)
+    {
+        ForkJoinPool forkJoinPool = new ForkJoinPool();
+        Integer result = forkJoinPool.invoke(new AddTask(10));
+        log.info("结果：" + result);
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-10  13:19:17.887  [ForkJoinPool-1-worker-3] DEBUG mao.t1.AddTask:  fork 2 {1}
+2022-09-10  13:19:17.887  [ForkJoinPool-1-worker-17] DEBUG mao.t1.AddTask:  fork 3 {2}
+2022-09-10  13:19:17.887  [ForkJoinPool-1-worker-19] DEBUG mao.t1.AddTask:  fork 10 {9}
+2022-09-10  13:19:17.887  [ForkJoinPool-1-worker-9] DEBUG mao.t1.AddTask:  fork 7 {6}
+2022-09-10  13:19:17.887  [ForkJoinPool-1-worker-23] DEBUG mao.t1.AddTask:  fork 8 {7}
+2022-09-10  13:19:17.887  [ForkJoinPool-1-worker-5] DEBUG mao.t1.AddTask:  fork 9 {8}
+2022-09-10  13:19:17.887  [ForkJoinPool-1-worker-27] DEBUG mao.t1.AddTask:  fork 6 {5}
+2022-09-10  13:19:17.887  [ForkJoinPool-1-worker-31] DEBUG mao.t1.AddTask:  fork 4 {3}
+2022-09-10  13:19:17.887  [ForkJoinPool-1-worker-13] DEBUG mao.t1.AddTask:  fork 5 {4}
+2022-09-10  13:19:17.887  [ForkJoinPool-1-worker-21] DEBUG mao.t1.AddTask:  join 1
+2022-09-10  13:19:17.893  [ForkJoinPool-1-worker-3] DEBUG mao.t1.AddTask:  join 2 {1} 3
+2022-09-10  13:19:17.894  [ForkJoinPool-1-worker-17] DEBUG mao.t1.AddTask:  join 3 {2} 6
+2022-09-10  13:19:17.894  [ForkJoinPool-1-worker-31] DEBUG mao.t1.AddTask:  join 4 {3} 10
+2022-09-10  13:19:17.894  [ForkJoinPool-1-worker-13] DEBUG mao.t1.AddTask:  join 5 {4} 15
+2022-09-10  13:19:17.894  [ForkJoinPool-1-worker-27] DEBUG mao.t1.AddTask:  join 6 {5} 21
+2022-09-10  13:19:17.894  [ForkJoinPool-1-worker-9] DEBUG mao.t1.AddTask:  join 7 {6} 28
+2022-09-10  13:19:17.894  [ForkJoinPool-1-worker-23] DEBUG mao.t1.AddTask:  join 8 {7} 36
+2022-09-10  13:19:17.894  [ForkJoinPool-1-worker-5] DEBUG mao.t1.AddTask:  join 9 {8} 45
+2022-09-10  13:19:17.895  [ForkJoinPool-1-worker-19] DEBUG mao.t1.AddTask:  join 10 {9} 55
+2022-09-10  13:19:17.895  [main] INFO  mao.t1.Test:  结果：55
+```
+
+
+
+
+
+![image-20220910132122035](img/java并发编程学习笔记/image-20220910132122035.png)
+
+
+
+
+
+
+
+**改进**
+
+
+
+```java
+package mao.t2;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.RecursiveTask;
+
+/**
+ * Project name(项目名称)：java并发编程_Fork_Join
+ * Package(包名): mao.t2
+ * Class(类名): AddTask
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/10
+ * Time(创建时间)： 13:22
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class AddTask extends RecursiveTask<Integer>
+{
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(AddTask.class);
+
+    /**
+     * 开始
+     */
+    int begin;
+    /**
+     * 结束
+     */
+    int end;
+
+
+    /**
+     * 添加任务
+     *
+     * @param begin 开始
+     * @param end   结束
+     */
+    public AddTask(int begin, int end)
+    {
+        this.begin = begin;
+        this.end = end;
+    }
+
+    @Override
+    public String toString()
+    {
+        return "{" + begin + "," + end + '}';
+    }
+
+
+    /**
+     * 计算
+     *
+     * @return {@link Integer}
+     */
+    @Override
+    protected Integer compute()
+    {
+        if (begin == end)
+        {
+            log.debug("join " + begin);
+            return begin;
+        }
+        if (begin == end - 1)
+        {
+            int result = begin + end;
+            log.debug("join " + begin + " " + end + " " + result);
+            return result;
+        }
+
+        //中间
+        int m = (begin + end) / 2;
+        AddTask addTaskLeft = new AddTask(begin, m);
+        AddTask addTaskRight = new AddTask(m + 1, end);
+        addTaskLeft.fork();
+        addTaskRight.fork();
+        log.debug("fork " + addTaskLeft + "    " + addTaskRight);
+        int result = addTaskLeft.join() + addTaskRight.join();
+        log.debug("join  " + addTaskLeft + "    " + addTaskRight + "    " + result);
+        return result;
+    }
+}
+```
+
+
+
+```java
+package mao.t2;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.ForkJoinPool;
+
+/**
+ * Project name(项目名称)：java并发编程_Fork_Join
+ * Package(包名): mao.t2
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/10
+ * Time(创建时间)： 13:30
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args)
+    {
+        ForkJoinPool forkJoinPool = new ForkJoinPool();
+        Integer result = forkJoinPool.invoke(new AddTask(1, 15));
+        log.info("结果：" + result);
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-10  13:37:25.782  [ForkJoinPool-1-worker-29] DEBUG mao.t2.AddTask:  join 5 6 11
+2022-09-10  13:37:25.782  [ForkJoinPool-1-worker-13] DEBUG mao.t2.AddTask:  fork {13,14}    {15,15}
+2022-09-10  13:37:25.782  [ForkJoinPool-1-worker-5] DEBUG mao.t2.AddTask:  fork {1,4}    {5,8}
+2022-09-10  13:37:25.782  [ForkJoinPool-1-worker-19] DEBUG mao.t2.AddTask:  fork {1,8}    {9,15}
+2022-09-10  13:37:25.782  [ForkJoinPool-1-worker-27] DEBUG mao.t2.AddTask:  fork {1,2}    {3,4}
+2022-09-10  13:37:25.782  [ForkJoinPool-1-worker-25] DEBUG mao.t2.AddTask:  join 1 2 3
+2022-09-10  13:37:25.782  [ForkJoinPool-1-worker-15] DEBUG mao.t2.AddTask:  join 7 8 15
+2022-09-10  13:37:25.782  [ForkJoinPool-1-worker-17] DEBUG mao.t2.AddTask:  join 9 10 19
+2022-09-10  13:37:25.782  [ForkJoinPool-1-worker-11] DEBUG mao.t2.AddTask:  join 3 4 7
+2022-09-10  13:37:25.782  [ForkJoinPool-1-worker-3] DEBUG mao.t2.AddTask:  join 11 12 23
+2022-09-10  13:37:25.782  [ForkJoinPool-1-worker-9] DEBUG mao.t2.AddTask:  fork {9,10}    {11,12}
+2022-09-10  13:37:25.782  [ForkJoinPool-1-worker-7] DEBUG mao.t2.AddTask:  join 15
+2022-09-10  13:37:25.782  [ForkJoinPool-1-worker-21] DEBUG mao.t2.AddTask:  join 13 14 27
+2022-09-10  13:37:25.782  [ForkJoinPool-1-worker-31] DEBUG mao.t2.AddTask:  fork {5,6}    {7,8}
+2022-09-10  13:37:25.782  [ForkJoinPool-1-worker-23] DEBUG mao.t2.AddTask:  fork {9,12}    {13,15}
+2022-09-10  13:37:25.790  [ForkJoinPool-1-worker-13] DEBUG mao.t2.AddTask:  join  {13,14}    {15,15}    42
+2022-09-10  13:37:25.790  [ForkJoinPool-1-worker-31] DEBUG mao.t2.AddTask:  join  {5,6}    {7,8}    26
+2022-09-10  13:37:25.790  [ForkJoinPool-1-worker-9] DEBUG mao.t2.AddTask:  join  {9,10}    {11,12}    42
+2022-09-10  13:37:25.790  [ForkJoinPool-1-worker-27] DEBUG mao.t2.AddTask:  join  {1,2}    {3,4}    10
+2022-09-10  13:37:25.790  [ForkJoinPool-1-worker-5] DEBUG mao.t2.AddTask:  join  {1,4}    {5,8}    36
+2022-09-10  13:37:25.790  [ForkJoinPool-1-worker-23] DEBUG mao.t2.AddTask:  join  {9,12}    {13,15}    84
+2022-09-10  13:37:25.791  [ForkJoinPool-1-worker-19] DEBUG mao.t2.AddTask:  join  {1,8}    {9,15}    120
+2022-09-10  13:37:25.791  [main] INFO  mao.t2.Test:  结果：120
+```
+
+
+
+
+
+![image-20220910133934048](img/java并发编程学习笔记/image-20220910133934048.png)
+
+
+
