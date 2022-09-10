@@ -21075,3 +21075,277 @@ public class Test
 
 ### 处理执行任务异常
 
+
+
+```java
+package mao.t5;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * Project name(项目名称)：java并发编程_任务调度线程池
+ * Package(包名): mao.t5
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/9
+ * Time(创建时间)： 20:04
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args)
+    {
+        log.debug("开始运行");
+        ScheduledExecutorService threadPool = Executors.newScheduledThreadPool(2);
+
+        for (int i = 0; i < 2; i++)
+        {
+            int finalI = i;
+            threadPool.scheduleWithFixedDelay(new Runnable()
+            {
+                @Override
+                @SuppressWarnings("all")
+                public void run()
+                {
+                    log.debug(finalI + "开始");
+                    int j = 1 / 0;
+                    log.debug(finalI + "结束");
+                }
+            }, 1, 2, TimeUnit.SECONDS);
+        }
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-09  20:05:35.608  [main] DEBUG mao.t5.Test:  开始运行
+2022-09-09  20:05:36.620  [pool-2-thread-1] DEBUG mao.t5.Test:  0开始
+2022-09-09  20:05:36.620  [pool-2-thread-2] DEBUG mao.t5.Test:  1开始
+```
+
+
+
+并没有抛出异常
+
+
+
+#### 方法1 主动捉异常
+
+
+
+```java
+package mao.t6;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * Project name(项目名称)：java并发编程_任务调度线程池
+ * Package(包名): mao.t6
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/9
+ * Time(创建时间)： 20:07
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args)
+    {
+        log.debug("开始运行");
+        ScheduledExecutorService threadPool = Executors.newScheduledThreadPool(2);
+
+        for (int i = 0; i < 2; i++)
+        {
+            int finalI = i;
+            threadPool.scheduleWithFixedDelay(new Runnable()
+            {
+                @Override
+                @SuppressWarnings("all")
+                public void run()
+                {
+                    try
+                    {
+                        log.debug(finalI + "开始");
+                        int j = 1 / 0;
+                        log.debug(finalI + "结束");
+                    }
+                    catch (Exception e)
+                    {
+                        log.error("产生异常！异常内容：", e);
+                    }
+                }
+            }, 1, 2, TimeUnit.SECONDS);
+        }
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-09  20:08:59.814  [main] DEBUG mao.t6.Test:  开始运行
+2022-09-09  20:09:00.821  [pool-2-thread-2] DEBUG mao.t6.Test:  1开始
+2022-09-09  20:09:00.821  [pool-2-thread-1] DEBUG mao.t6.Test:  0开始
+2022-09-09  20:09:00.822  [pool-2-thread-1] ERROR mao.t6.Test:  产生异常！异常内容：
+java.lang.ArithmeticException: / by zero
+	at mao.t6.Test$1.run(Test.java:47) [classes/:?]
+	at java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:515) [?:?]
+	at java.util.concurrent.FutureTask.runAndReset(FutureTask.java:305) [?:?]
+	at java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:305) [?:?]
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1130) [?:?]
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:630) [?:?]
+	at java.lang.Thread.run(Thread.java:831) [?:?]
+2022-09-09  20:09:00.822  [pool-2-thread-2] ERROR mao.t6.Test:  产生异常！异常内容：
+java.lang.ArithmeticException: / by zero
+	at mao.t6.Test$1.run(Test.java:47) [classes/:?]
+	at java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:515) [?:?]
+	at java.util.concurrent.FutureTask.runAndReset(FutureTask.java:305) [?:?]
+	at java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:305) [?:?]
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1130) [?:?]
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:630) [?:?]
+	at java.lang.Thread.run(Thread.java:831) [?:?]
+2022-09-09  20:09:02.838  [pool-2-thread-1] DEBUG mao.t6.Test:  0开始
+2022-09-09  20:09:02.838  [pool-2-thread-2] DEBUG mao.t6.Test:  1开始
+2022-09-09  20:09:02.838  [pool-2-thread-2] ERROR mao.t6.Test:  产生异常！异常内容：
+java.lang.ArithmeticException: / by zero
+	at mao.t6.Test$1.run(Test.java:47) [classes/:?]
+	at java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:515) [?:?]
+	at java.util.concurrent.FutureTask.runAndReset(FutureTask.java:305) [?:?]
+	at java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:305) [?:?]
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1130) [?:?]
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:630) [?:?]
+	at java.lang.Thread.run(Thread.java:831) [?:?]
+2022-09-09  20:09:02.838  [pool-2-thread-1] ERROR mao.t6.Test:  产生异常！异常内容：
+java.lang.ArithmeticException: / by zero
+	at mao.t6.Test$1.run(Test.java:47) [classes/:?]
+	at java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:515) [?:?]
+	at java.util.concurrent.FutureTask.runAndReset(FutureTask.java:305) [?:?]
+	at java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:305) [?:?]
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1130) [?:?]
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:630) [?:?]
+	at java.lang.Thread.run(Thread.java:831) [?:?]
+```
+
+
+
+
+
+#### 方法2 使用 Future
+
+
+
+```java
+package mao.t7;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.*;
+
+/**
+ * Project name(项目名称)：java并发编程_任务调度线程池
+ * Package(包名): mao.t7
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/9
+ * Time(创建时间)： 20:10
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(mao.t5.Test.class);
+
+    public static void main(String[] args) throws ExecutionException, InterruptedException
+    {
+        log.debug("开始运行");
+        ExecutorService threadPool = Executors.newFixedThreadPool(1);
+
+        for (int i = 0; i < 2; i++)
+        {
+            int finalI = i;
+            Future<?> future = threadPool.submit(new Runnable()
+            {
+                @Override
+                @SuppressWarnings("all")
+                public void run()
+                {
+                    log.debug(finalI + "开始");
+                    int j = 1 / 0;
+                    log.debug(finalI + "结束");
+                }
+            });
+            future.get();
+        }
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-09  20:17:24.921  [main] DEBUG mao.t5.Test:  开始运行
+2022-09-09  20:17:24.925  [pool-2-thread-1] DEBUG mao.t5.Test:  0开始
+Exception in thread "main" java.util.concurrent.ExecutionException: java.lang.ArithmeticException: / by zero
+	at java.base/java.util.concurrent.FutureTask.report(FutureTask.java:122)
+	at java.base/java.util.concurrent.FutureTask.get(FutureTask.java:191)
+	at mao.t7.Test.main(Test.java:47)
+Caused by: java.lang.ArithmeticException: / by zero
+	at mao.t7.Test$1.run(Test.java:43)
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:515)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:264)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1130)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:630)
+	at java.base/java.lang.Thread.run(Thread.java:831)
+```
+
+
+
+
+
+
+
+### 定时任务
+
