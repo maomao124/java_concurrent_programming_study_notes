@@ -21981,3 +21981,350 @@ if (tryRelease(arg))
 
 #### 实现不可重入锁
 
+
+
+```java
+import java.util.concurrent.locks.AbstractQueuedSynchronizer;
+import java.util.concurrent.locks.Condition;
+
+/**
+ * Project name(项目名称)：java并发编程_AQS
+ * Package(包名): PACKAGE_NAME
+ * Class(类名): MySync
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/11
+ * Time(创建时间)： 13:06
+ * Version(版本): 1.0
+ * Description(描述)： 自定义同步器
+ */
+
+public final class MySync extends AbstractQueuedSynchronizer
+{
+    @Override
+    protected boolean tryAcquire(int arg)
+    {
+        if (arg == 1)
+        {
+            if (compareAndSetState(0, 1))
+            {
+                setExclusiveOwnerThread(Thread.currentThread());
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    protected boolean tryRelease(int arg)
+    {
+        if (arg == 1)
+        {
+            if (getState() == 0)
+            {
+                throw new IllegalMonitorStateException();
+            }
+            setExclusiveOwnerThread(null);
+            setState(0);
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    protected boolean isHeldExclusively()
+    {
+        return getState() == 1;
+    }
+
+    Condition newCondition()
+    {
+        return new ConditionObject();
+    }
+}
+```
+
+
+
+```java
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
+
+/**
+ * Project name(项目名称)：java并发编程_AQS
+ * Package(包名): PACKAGE_NAME
+ * Class(类名): MyLock
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/11
+ * Time(创建时间)： 13:13
+ * Version(版本): 1.0
+ * Description(描述)： 自定义锁
+ */
+
+public class MyLock implements Lock
+{
+    private static final MySync sync = new MySync();
+
+    @Override
+    public void lock()
+    {
+        sync.acquire(1);
+    }
+
+    @Override
+    public void lockInterruptibly() throws InterruptedException
+    {
+        sync.acquireInterruptibly(1);
+    }
+
+    @Override
+    public boolean tryLock()
+    {
+        return sync.tryAcquire(1);
+    }
+
+    @Override
+    public boolean tryLock(long time, TimeUnit unit) throws InterruptedException
+    {
+        return sync.tryAcquireNanos(1, unit.toNanos(time));
+    }
+
+    @Override
+    public void unlock()
+    {
+        sync.release(1);
+    }
+
+    @Override
+    public Condition newCondition()
+    {
+        return sync.newCondition();
+    }
+}
+```
+
+
+
+```java
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Project name(项目名称)：java并发编程_AQS
+ * Package(包名): PACKAGE_NAME
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/11
+ * Time(创建时间)： 13:19
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+    /**
+     * 锁
+     */
+    private static final MyLock lock = new MyLock();
+
+    public static void main(String[] args)
+    {
+        Thread thread1 = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                log.debug("尝试获取锁");
+                lock.lock();
+                try
+                {
+                    log.debug("获取到锁");
+                    Thread.sleep(1000);
+                }
+                catch (InterruptedException e)
+                {
+                    e.printStackTrace();
+                }
+                finally
+                {
+                    lock.unlock();
+                    log.debug("释放锁");
+                }
+            }
+        }, "t1");
+
+        Thread thread2 = new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                log.debug("尝试获取锁");
+                lock.lock();
+                try
+                {
+                    log.debug("获取到锁");
+                    Thread.sleep(1000);
+                }
+                catch (InterruptedException e)
+                {
+                    e.printStackTrace();
+                }
+                finally
+                {
+                    lock.unlock();
+                    log.debug("释放锁");
+                }
+            }
+        }, "t2");
+
+        thread1.start();
+        thread2.start();
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-11  13:28:38.247  [t1] DEBUG Test:  尝试获取锁
+2022-09-11  13:28:38.247  [t2] DEBUG Test:  尝试获取锁
+2022-09-11  13:28:38.249  [t1] DEBUG Test:  获取到锁
+2022-09-11  13:28:39.252  [t1] DEBUG Test:  释放锁
+2022-09-11  13:28:39.252  [t2] DEBUG Test:  获取到锁
+2022-09-11  13:28:40.254  [t2] DEBUG Test:  释放锁
+```
+
+
+
+
+
+**不可重入测试：**
+
+
+
+```java
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.locks.ReentrantLock;
+
+/**
+ * Project name(项目名称)：java并发编程_AQS
+ * Package(包名): PACKAGE_NAME
+ * Class(类名): Test2
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/11
+ * Time(创建时间)： 13:31
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test2
+{
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test2.class);
+
+    /**
+     * 不可重入锁
+     */
+    private static final MyLock lock = new MyLock();
+
+    /**
+     * 可重入锁
+     */
+    //private static final ReentrantLock lock = new ReentrantLock();
+
+    public static void main(String[] args)
+    {
+        log.debug("尝试获取锁");
+        lock.lock();
+        try
+        {
+            log.debug("获取到锁");
+            m1();
+        }
+        finally
+        {
+            lock.unlock();
+            log.debug("释放锁");
+        }
+
+    }
+
+    private static void m1()
+    {
+        log.debug("尝试获取锁");
+        lock.lock();
+        try
+        {
+            log.debug("获取到锁");
+            m2();
+        }
+        finally
+        {
+            lock.unlock();
+            log.debug("释放锁");
+        }
+    }
+
+    private static void m2()
+    {
+        log.debug("尝试获取锁");
+        lock.lock();
+        try
+        {
+            log.debug("获取到锁");
+            m3();
+        }
+        finally
+        {
+            lock.unlock();
+            log.debug("释放锁");
+        }
+    }
+
+    private static void m3()
+    {
+        log.debug("尝试获取锁");
+        lock.lock();
+        try
+        {
+            log.debug("获取到锁");
+        }
+        finally
+        {
+            lock.unlock();
+            log.debug("释放锁");
+        }
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-11  13:36:16.697  [main] DEBUG Test2:  尝试获取锁
+2022-09-11  13:36:16.699  [main] DEBUG Test2:  获取到锁
+2022-09-11  13:36:16.699  [main] DEBUG Test2:  尝试获取锁
+```
+
+
+
