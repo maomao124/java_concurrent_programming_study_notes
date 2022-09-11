@@ -22328,3 +22328,159 @@ public class Test2
 
 
 
+
+
+#### 设计
+
+**获取锁的逻辑：**
+
+```
+while(state 状态不允许获取) 
+{
+ if(队列中还没有此线程) 
+ {
+ 入队并阻塞
+ }
+}
+当前线程出队
+```
+
+
+
+**释放锁的逻辑：**
+
+```
+if(state 状态允许了) 
+{
+ 恢复阻塞的线程(s)
+}
+
+```
+
+
+
+**state 设计：**
+
+* state 使用 volatile 配合 cas 保证其修改时的原子性
+* state 使用了 32bit int 来维护同步状态，因为当时使用 long 在很多平台下测试的结果并不理想
+
+
+
+**阻塞恢复设计：**
+
+* 早期的控制线程暂停和恢复的 api 有 suspend 和 resume，但它们是不可用的，因为如果先调用的 resume  那么 suspend 将感知不到
+* 解决方法是使用 park & unpark 来实现线程的暂停和恢复
+* park & unpark 是针对线程的，而不是针对同步器的，因此控制粒度更为精细
+* park 线程还可以通过 interrupt 打断
+
+
+
+**队列设计：**
+
+* 使用了 FIFO 先入先出队列，并不支持优先级队列
+* 设计时借鉴了 CLH 队列，它是一种单向无锁队列
+
+
+
+**CLH 好处：**
+
+* 无锁，使用自旋
+* 快速，无阻塞
+
+
+
+
+
+
+
+### ReentrantLock 原理
+
+
+
+![image-20220911135704057](img/java并发编程学习笔记/image-20220911135704057.png)
+
+
+
+
+
+#### 非公平锁实现原理
+
+
+
+默认为非公平锁实现
+
+```java
+/**
+ * Creates an instance of {@code ReentrantLock}.
+ * This is equivalent to using {@code ReentrantLock(false)}.
+ */
+public ReentrantLock() {
+    sync = new NonfairSync();
+}
+```
+
+
+
+可以选择是否为公平锁
+
+```java
+/**
+ * Creates an instance of {@code ReentrantLock} with the
+ * given fairness policy.
+ *
+ * @param fair {@code true} if this lock should use a fair ordering policy
+ */
+public ReentrantLock(boolean fair) {
+    sync = fair ? new FairSync() : new NonfairSync();
+}
+```
+
+
+
+NonfairSync 继承自 AQS
+
+
+
+没有竞争时
+
+![image-20220911140024111](img/java并发编程学习笔记/image-20220911140024111.png)
+
+
+
+第一个竞争出现时
+
+
+
+![image-20220911140140123](img/java并发编程学习笔记/image-20220911140140123.png)
+
+
+
+
+
+Thread-1 执行：
+
+*  CAS 尝试将 state 由 0 改为 1，结果失败
+* 进入 tryAcquire 逻辑，这时 state 已经是1，结果仍然失败
+* 接下来进入 addWaiter 逻辑，构造 Node 队列
+  * 图中黄色三角表示该 Node 的 waitStatus 状态，其中 0 为默认正常状态
+  * Node 的创建是懒惰的
+  * 其中第一个 Node 称为 Dummy（哑元）或哨兵，用来占位，并不关联线程
+
+
+
+![image-20220911140631546](img/java并发编程学习笔记/image-20220911140631546.png)
+
+
+
+当前线程进入 acquireQueued 逻辑
+
+* acquireQueued 会在一个死循环中不断尝试获得锁，失败后进入 park 阻塞
+* 如果自己是紧邻着 head（排第二位），那么再次 tryAcquire 尝试获取锁，当然这时 state 仍为 1，失败
+* 进入 shouldParkAfterFailedAcquire 逻辑，将前驱 node，即 head 的 waitStatus 改为 -1，这次返回 false
+
+
+
+![image-20220911140856981](img/java并发编程学习笔记/image-20220911140856981.png)
+
+
+
