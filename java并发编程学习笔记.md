@@ -22916,3 +22916,75 @@ public class FairSync extends Sync
 
 #### 条件变量实现原理
 
+每个条件变量其实就对应着一个等待队列，其实现类是 ConditionObject
+
+
+
+**await 流程**
+
+开始 Thread-0 持有锁，调用 await，进入 ConditionObject 的 addConditionWaiter 流程
+
+创建新的 Node 状态为 -2（Node.CONDITION），关联 Thread-0，加入等待队列尾部
+
+
+
+![image-20220911192828100](img/java并发编程学习笔记/image-20220911192828100.png)
+
+
+
+接下来进入 AQS 的 fullyRelease 流程，释放同步器上的锁
+
+
+
+![image-20220911192927835](img/java并发编程学习笔记/image-20220911192927835.png)
+
+
+
+unpark AQS 队列中的下一个节点，竞争锁，假设没有其他竞争线程，那么 Thread-1 竞争成功
+
+
+
+![image-20220911193045121](img/java并发编程学习笔记/image-20220911193045121.png)
+
+
+
+park 阻塞 Thread-0
+
+
+
+![image-20220911193158175](img/java并发编程学习笔记/image-20220911193158175.png)
+
+
+
+
+
+**signal 流程**
+
+假设 Thread-1 要来唤醒 Thread-0
+
+
+
+![image-20220911193432215](img/java并发编程学习笔记/image-20220911193432215.png)
+
+
+
+进入 ConditionObject 的 doSignal 流程，取得等待队列中第一个 Node，即 Thread-0 所在 Node
+
+
+
+![image-20220911193544995](img/java并发编程学习笔记/image-20220911193544995.png)
+
+
+
+执行 transferForSignal 流程，将该 Node 加入 AQS 队列尾部，将 Thread-0 的 waitStatus 改为 0，Thread-3 的 waitStatus 改为 -1
+
+
+
+![image-20220911193646549](img/java并发编程学习笔记/image-20220911193646549.png)
+
+
+
+
+
+源码
+
