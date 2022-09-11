@@ -21825,3 +21825,159 @@ public class Test
 
 
 
+
+
+```java
+package mao.t3;
+
+import mao.t2.AddTask;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.ForkJoinPool;
+
+/**
+ * Project name(项目名称)：java并发编程_Fork_Join
+ * Package(包名): mao.t3
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/10
+ * Time(创建时间)： 13:40
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 大小
+     */
+    private static final int size = 50000;
+
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    /**
+     * test1
+     *
+     * @param forkJoinPool 连接池
+     */
+    private static void test1(ForkJoinPool forkJoinPool)
+    {
+        long startAll = System.currentTimeMillis();
+        for (int i = 0; i < 10; i++)
+        {
+            long start = System.currentTimeMillis();
+            Integer result = forkJoinPool.invoke(new AddTask(1, size));
+            long end = System.currentTimeMillis();
+            log.info("结果：" + result + ", 花费时间：" + (end - start) + "ms");
+        }
+        long endAll = System.currentTimeMillis();
+        log.info("花费总时间：" + (endAll - startAll) + "ms");
+    }
+
+    /**
+     * test2
+     */
+    private static void test2()
+    {
+        long startAll = System.currentTimeMillis();
+        for (int j = 0; j < 10; j++)
+        {
+            long start = System.currentTimeMillis();
+            long total = 0;
+            for (int i = 1; i <= size; i++)
+            {
+                total = total + i;
+            }
+            long end = System.currentTimeMillis();
+            log.info("结果：" + total + ", 花费时间：" + (end - start) + "ms");
+        }
+        long endAll = System.currentTimeMillis();
+        log.info("花费总时间：" + (endAll - startAll) + "ms");
+    }
+    
+    public static void main(String[] args)
+    {
+        ForkJoinPool forkJoinPool = new ForkJoinPool();
+        test1(forkJoinPool);
+
+        test2();
+    }
+
+}
+```
+
+
+
+
+
+
+
+
+
+## JUC
+
+### AQS
+
+#### 概述
+
+全称是 AbstractQueuedSynchronizer，是阻塞式锁和相关的同步器工具的框架
+
+
+
+用 state 属性来表示资源的状态（分独占模式和共享模式），子类需要定义如何维护这个状态，控制如何获取锁和释放锁
+
+* getState - 获取 state 状态
+* setState - 设置 state 状态
+* compareAndSetState - cas 机制设置 state 状态
+* 独占模式是只有一个线程能够访问资源，而共享模式可以允许多个线程访问资源
+
+提供了基于 FIFO 的等待队列，类似于 Monitor 的 EntryList
+
+条件变量来实现等待、唤醒机制，支持多个条件变量，类似于 Monitor 的 WaitSet
+
+
+
+子类主要实现这样一些方法
+
+* tryAcquire 
+* tryRelease 
+* tryAcquireShared 
+* tryReleaseShared 
+* isHeldExclusively
+
+
+
+获取锁：
+
+```java
+// 如果获取锁失败
+if (!tryAcquire(arg)) 
+{
+ // 入队, 可以选择阻塞当前线程 park unpark
+}
+```
+
+
+
+释放锁：
+
+```java
+// 如果释放锁成功
+if (tryRelease(arg)) 
+{
+ // 让阻塞线程恢复运行
+}
+```
+
+
+
+
+
+#### 实现不可重入锁
+
