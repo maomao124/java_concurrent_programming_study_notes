@@ -22484,3 +22484,435 @@ Thread-1 执行：
 
 
 
+* shouldParkAfterFailedAcquire 执行完毕回到 acquireQueued ，再次 tryAcquire 尝试获取锁，当然这时 state 仍为 1，失败
+* 当再次进入 shouldParkAfterFailedAcquire 时，这时因为其前驱 node 的 waitStatus 已经是 -1，这次返回 true
+* 进入 parkAndCheckInterrupt， Thread-1 park（灰色表示）
+
+
+
+![image-20220911185320036](img/java并发编程学习笔记/image-20220911185320036.png)
+
+
+
+![image-20220911185406626](img/java并发编程学习笔记/image-20220911185406626.png)
+
+
+
+
+
+Thread-0 释放锁，进入 tryRelease 流程，如果成功
+
+* 设置 exclusiveOwnerThread 为 null
+* state = 0
+
+
+
+![image-20220911185943234](img/java并发编程学习笔记/image-20220911185943234.png)
+
+
+
+
+
+* 当前队列不为 null，并且 head 的 waitStatus = -1，进入 unparkSuccessor 流程
+* 找到队列中离 head 最近的一个 Node（没取消的），unpark 恢复其运行，即为 Thread-1
+* 回到 Thread-1 的 acquireQueued 流程
+
+
+
+![image-20220911190103210](img/java并发编程学习笔记/image-20220911190103210.png)
+
+
+
+如果加锁成功（没有竞争），会设置
+
+* exclusiveOwnerThread 为 Thread-1，state = 1
+* head 指向刚刚 Thread-1 所在的 Node，该 Node 清空 Thread
+* 原本的 head 因为从链表断开，而可被垃圾回收
+
+
+
+如果这时候有其它线程来竞争（非公平的体现），例如这时有 Thread-4 来了
+
+
+
+如果不巧又被 Thread-4 占了先
+
+* Thread-4 被设置为 exclusiveOwnerThread，state = 1
+* Thread-1 再次进入 acquireQueued 流程，获取锁失败，重新进入 park 阻塞
+
+
+
+![image-20220911190315957](img/java并发编程学习笔记/image-20220911190315957.png)
+
+
+
+
+
+
+
+部分源码：
+
+```java
+
+
+public class NonfairSync extends Sync
+{
+    private static final long serialVersionUID = 7316153563782823691L;
+
+    // 加锁实现
+    final void lock()
+    {
+        // 首先用 cas 尝试（仅尝试一次）将 state 从 0 改为 1, 如果成功表示获得了独占锁
+        if (compareAndSetState(0, 1))
+        {
+            setExclusiveOwnerThread(Thread.currentThread());
+        }
+        else
+        // 如果尝试失败，进入 ㈠
+        {
+            acquire(1);
+        }
+    }
+
+    // ㈠ AQS 继承过来的方法, 方便阅读, 放在此处
+    public final void acquire(int arg)
+    {
+        // ㈡ tryAcquire
+        if (
+                !tryAcquire(arg) &&
+                        // 当 tryAcquire 返回为 false 时, 先调用 addWaiter ㈣, 接着 acquireQueued ㈤
+                        acquireQueued(addWaiter(Node.EXCLUSIVE), arg)
+        )
+        {
+            selfInterrupt();
+        }
+    }
+
+    // ㈡ 进入 ㈢
+    protected final boolean tryAcquire(int acquires)
+    {
+        return nonfairTryAcquire(acquires);
+    }
+
+    // ㈢ Sync 继承过来的方法, 方便阅读, 放在此处
+    final boolean nonfairTryAcquire(int acquires)
+    {
+        final Thread current = Thread.currentThread();
+        int c = getState();
+        // 如果还没有获得锁
+        if (c == 0)
+        {
+            // 尝试用 cas 获得, 这里体现了非公平性: 不去检查 AQS 队列
+            if (compareAndSetState(0, acquires))
+            {
+                setExclusiveOwnerThread(current);
+                return true;
+            }
+        }
+        // 如果已经获得了锁, 线程还是当前线程, 表示发生了锁重入
+        else if (current == getExclusiveOwnerThread())
+        {
+            // state++
+            int nextc = c + acquires;
+            if (nextc < 0) // overflow
+            {
+                throw new Error("Maximum lock count exceeded");
+            }
+            setState(nextc);
+            return true;
+        }
+        // 获取失败, 回到调用处
+        return false;
+    }
+
+    // ㈣ AQS 继承过来的方法, 方便阅读, 放在此处
+    private Node addWaiter(Node mode)
+    {// 将当前线程关联到一个 Node 对象上, 模式为独占模式
+        Node node = new Node(Thread.currentThread(), mode);
+        // 如果 tail 不为 null, cas 尝试将 Node 对象加入 AQS 队列尾部
+        Node pred = tail;
+        if (pred != null)
+        {
+            node.prev = pred;
+            if (compareAndSetTail(pred, node))
+            {
+                // 双向链表
+                pred.next = node;
+                return node;
+            }
+        }
+        // 尝试将 Node 加入 AQS, 进入 ㈥
+        enq(node);
+        return node;
+    }
+
+    // ㈥ AQS 继承过来的方法, 方便阅读, 放在此处
+    private Node enq(final Node node)
+    {
+        for (; ; )
+        {
+            Node t = tail;
+            if (t == null)
+            {
+                // 还没有, 设置 head 为哨兵节点（不对应线程，状态为 0）
+                if (compareAndSetHead(new Node()))
+                {
+                    tail = head;
+                }
+            }
+            else
+            {
+                // cas 尝试将 Node 对象加入 AQS 队列尾部
+                node.prev = t;
+                if (compareAndSetTail(t, node))
+                {
+                    t.next = node;
+                    return t;
+                }
+            }
+        }
+    }
+
+    // ㈤ AQS 继承过来的方法, 方便阅读, 放在此处
+    final boolean acquireQueued(final Node node, int arg)
+    {
+        boolean failed = true;
+        try
+        {
+            boolean interrupted = false;
+            for (; ; )
+            {
+                final Node p = node.predecessor();
+                // 上一个节点是 head, 表示轮到自己（当前线程对应的 node）了, 尝试获取
+                if (p == head && tryAcquire(arg))
+                {
+                    // 获取成功, 设置自己（当前线程对应的 node）为 head
+                    setHead(node);
+                    // 上一个节点 help GC
+                    p.next = null;
+                    failed = false;
+                    // 返回中断标记 false
+                    return interrupted;
+                }
+                if (
+                    // 判断是否应当 park, 进入 ㈦
+                        shouldParkAfterFailedAcquire(p, node) &&
+                                // park 等待, 此时 Node 的状态被置为 Node.SIGNAL ㈧
+                                parkAndCheckInterrupt()
+                )
+                {
+                    interrupted = true;
+                }
+            }
+        }
+        finally
+        {
+            if (failed)
+            {
+                cancelAcquire(node);
+            }
+        }
+    }
+
+    // ㈦ AQS 继承过来的方法, 方便阅读, 放在此处
+    private static boolean shouldParkAfterFailedAcquire(Node pred, Node node)
+    {
+        // 获取上一个节点的状态
+        int ws = pred.waitStatus;
+        if (ws == Node.SIGNAL)
+        {
+            // 上一个节点都在阻塞, 那么自己也阻塞好了
+            return true;
+        }
+        // > 0 表示取消状态
+        if (ws > 0)
+        {
+            // 上一个节点取消, 那么重构删除前面所有取消的节点, 返回到外层循环重试
+            do
+            {
+                node.prev = pred = pred.prev;
+            }
+            while (pred.waitStatus > 0);
+            pred.next = node;
+        }
+        else
+        {
+            // 这次还没有阻塞
+            // 但下次如果重试不成功, 则需要阻塞，这时需要设置上一个节点状态为 Node.SIGNAL
+            compareAndSetWaitStatus(pred, ws, Node.SIGNAL);
+        }
+        return false;
+    }
+
+    // ㈧ 阻塞当前线程
+    private final boolean parkAndCheckInterrupt()
+    {
+        LockSupport.park(this);
+        return Thread.interrupted();
+    }
+
+
+    //*************************************************************
+    
+    // 解锁实现
+    public void unlock()
+    {
+        sync.release(1);
+    }
+
+    // AQS 继承过来的方法, 方便阅读, 放在此处
+    public final boolean release(int arg)
+    {
+        // 尝试释放锁, 进入 ㈠
+        if (tryRelease(arg))
+        {
+            // 队列头节点 unpark
+            Node h = head;
+            if (
+                // 队列不为 null
+                    h != null &&
+                            // waitStatus == Node.SIGNAL 才需要 unpark
+                            h.waitStatus != 0
+            )
+            {
+                // unpark AQS 中等待的线程, 进入 ㈡
+                unparkSuccessor(h);
+            }
+            return true;
+        }
+        return false;
+    }
+
+    // ㈠ Sync 继承过来的方法, 方便阅读, 放在此处
+    protected final boolean tryRelease(int releases)
+    {
+        // state--
+        int c = getState() - releases;
+        if (Thread.currentThread() != getExclusiveOwnerThread())
+        {
+            throw new IllegalMonitorStateException();
+        }
+        boolean free = false;
+        // 支持锁重入, 只有 state 减为 0, 才释放成功
+        if (c == 0)
+        {
+            free = true;
+            setExclusiveOwnerThread(null);
+        }
+        setState(c);
+        return free;
+    }
+
+    // ㈡ AQS 继承过来的方法, 方便阅读, 放在此处
+    private void unparkSuccessor(Node node)
+    {
+        // 如果状态为 Node.SIGNAL 尝试重置状态为 0
+        // 不成功也可以
+        int ws = node.waitStatus;
+        if (ws < 0)
+        {
+            compareAndSetWaitStatus(node, ws, 0);
+        }
+        // 找到需要 unpark 的节点, 但本节点从 AQS 队列中脱离, 是由唤醒节点完成的Node s = node.next;
+        // // 不考虑已取消的节点, 从 AQS 队列从后至前找到队列最前面需要 unpark 的节点
+        // if (s == null || s.waitStatus > 0) {
+        // s = null;
+        // for (Node t = tail; t != null && t != node; t = t.prev)
+        // if (t.waitStatus <= 0)
+        // s = t;
+        // }
+        // if (s != null)
+        // LockSupport.unpark(s.thread);
+        // }
+    }
+
+}
+```
+
+
+
+
+
+
+
+#### 公平锁实现原理
+
+
+
+```java
+
+
+public class FairSync extends Sync
+{
+    private static final long serialVersionUID = -3000897897090466540L;
+
+    final void lock()
+    {
+        acquire(1);
+    }
+
+    // AQS 继承过来的方法, 方便阅读, 放在此处
+    public final void acquire(int arg)
+    {
+        if (
+                !tryAcquire(arg) &&
+                        acquireQueued(addWaiter(Node.EXCLUSIVE), arg)
+        )
+        {
+            selfInterrupt();
+        }
+    }
+
+    // 与非公平锁主要区别在于 tryAcquire 方法的实现
+    protected final boolean tryAcquire(int acquires)
+    {
+        final Thread current = Thread.currentThread();
+        int c = getState();
+        if (c == 0)
+        {
+            // 先检查 AQS 队列中是否有前驱节点, 没有才去竞争
+            if (!hasQueuedPredecessors() &&
+                    compareAndSetState(0, acquires))
+            {
+                setExclusiveOwnerThread(current);
+                return true;
+            }
+        }
+        else if (current == getExclusiveOwnerThread())
+        {
+            int nextc = c + acquires;
+            if (nextc < 0)
+            {
+                throw new Error("Maximum lock count exceeded");
+            }
+            setState(nextc);
+            return true;
+        }
+        return false;
+    }
+
+    // ㈠ AQS 继承过来的方法, 方便阅读, 放在此处
+    public final boolean hasQueuedPredecessors()
+    {
+        Node t = tail;
+        Node h = head;
+        Node s;
+        // h != t 时表示队列中有 Node
+        return h != t &&
+                (
+                        // (s = h.next) == null 表示队列中还有没有老二
+                        (s = h.next) == null ||
+                                // 或者队列中老二线程不是此线程
+                                s.thread != Thread.currentThread()
+                );
+    }
+}
+
+```
+
+
+
+
+
+#### 条件变量实现原理
+
