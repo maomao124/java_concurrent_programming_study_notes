@@ -23994,3 +23994,53 @@ t1 w.unlock，这时会走到写锁的 sync.release(1) 流程，调用 sync.tryR
 
 
 
+这回再来一次 for (;;) 执行 tryAcquireShared 成功则让读锁计数加一
+
+
+
+![image-20220912140450813](img/java并发编程学习笔记/image-20220912140450813.png)
+
+
+
+这时 t3 已经恢复运行，接下来 t3 调用 setHeadAndPropagate(node, 1)，它原本所在节点被置为头节点
+
+
+
+![image-20220912140543309](img/java并发编程学习笔记/image-20220912140543309.png)
+
+
+
+下一个节点不是 shared 了，因此不会继续唤醒 t4 所在节点
+
+
+
+t2 进入 sync.releaseShared(1) 中，调用 tryReleaseShared(1) 让计数减一，但由于计数还不为零
+
+
+
+![image-20220912140700856](img/java并发编程学习笔记/image-20220912140700856.png)
+
+
+
+t3 进入 sync.releaseShared(1) 中，调用 tryReleaseShared(1) 让计数减一，这回计数为零了，进入 doReleaseShared() 将头节点从 -1 改为 0 并唤醒第二个节点
+
+
+
+![image-20220912140804436](img/java并发编程学习笔记/image-20220912140804436.png)
+
+
+
+
+
+之后 t4 在 acquireQueued 中 parkAndCheckInterrupt 处恢复运行，再次 for (;;) 这次自己是第二个节点，并且没有其他竞争，tryAcquire(1) 成功，修改头结点，流程结束
+
+
+
+![image-20220912140922349](img/java并发编程学习笔记/image-20220912140922349.png)
+
+
+
+
+
+部分源码
+
