@@ -23713,3 +23713,196 @@ public class Test
 
 
 
+* 读锁不支持条件变量
+* 重入时升级不支持：即持有读锁的情况下去获取写锁，会导致获取写锁永久等待
+
+
+
+```java
+package mao.t2;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.UUID;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+
+/**
+ * Project name(项目名称)：java并发编程_ReentrantReadWriteLock
+ * Package(包名): mao.t2
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/12
+ * Time(创建时间)： 13:28
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 锁
+     */
+    private static final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
+
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args)
+    {
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                log.debug("尝试获取读锁");
+                lock.readLock().lock();
+                log.debug("获取到读锁");
+                try
+                {
+                    log.debug("尝试获取写锁");
+                    lock.writeLock().lock();
+                    log.debug("获取到写锁");
+                    try
+                    {
+                        Thread.sleep(1000);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                    finally
+                    {
+                        log.debug("释放写锁");
+                        lock.writeLock().unlock();
+                    }
+                }
+
+                finally
+                {
+                    log.debug("释放读锁");
+                    lock.readLock().unlock();
+                }
+            }
+        }, "read:" + UUID.randomUUID().toString().substring(0, 6)).start();
+    }
+
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-12  13:29:47.871  [read:669706] DEBUG mao.t2.Test:  尝试获取读锁
+2022-09-12  13:29:47.873  [read:669706] DEBUG mao.t2.Test:  获取到读锁
+2022-09-12  13:29:47.873  [read:669706] DEBUG mao.t2.Test:  尝试获取写锁
+...
+```
+
+
+
+
+
+* 重入时降级支持：即持有写锁的情况下去获取读锁
+
+
+
+```java
+package mao.t3;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.UUID;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+
+/**
+ * Project name(项目名称)：java并发编程_ReentrantReadWriteLock
+ * Package(包名): mao.t3
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/12
+ * Time(创建时间)： 13:31
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 锁
+     */
+    private static final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
+
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args)
+    {
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                log.debug("尝试获取写锁");
+                lock.writeLock().lock();
+                log.debug("获取到写锁");
+                try
+                {
+                    log.debug("尝试获取读锁");
+                    lock.readLock().lock();
+                    log.debug("获取到读锁");
+                    try
+                    {
+                        Thread.sleep(1000);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                    finally
+                    {
+                        log.debug("释放读锁");
+                        lock.readLock().unlock();
+                    }
+                }
+                finally
+                {
+                    log.debug("释放写锁");
+                    lock.writeLock().unlock();
+                }
+            }
+        }, "write:" + UUID.randomUUID().toString().substring(0, 6)).start();
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-12  13:33:23.559  [write:85f1ab] DEBUG mao.t3.Test:  尝试获取写锁
+2022-09-12  13:33:23.561  [write:85f1ab] DEBUG mao.t3.Test:  获取到写锁
+2022-09-12  13:33:23.562  [write:85f1ab] DEBUG mao.t3.Test:  尝试获取读锁
+2022-09-12  13:33:23.562  [write:85f1ab] DEBUG mao.t3.Test:  获取到读锁
+2022-09-12  13:33:24.564  [write:85f1ab] DEBUG mao.t3.Test:  释放读锁
+2022-09-12  13:33:24.564  [write:85f1ab] DEBUG mao.t3.Test:  释放写锁
+```
+
+
+
+
+
+#### 读写锁原理
+
