@@ -23332,5 +23332,384 @@ public class ConditionObject implements Condition, java.io.Serializable
 
 #### ReentrantReadWriteLock
 
+当读操作远远高于写操作时，这时候使用 读写锁 让 读-读 可以并发，提高性能。
+
+
+
+读-读 可以并发
+
+```java
+package mao.t1;
+
+import org.apache.logging.log4j.core.util.UuidUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.UUID;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+
+/**
+ * Project name(项目名称)：java并发编程_ReentrantReadWriteLock
+ * Package(包名): mao.t1
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/12
+ * Time(创建时间)： 13:08
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 锁
+     */
+    private static final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
+
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    /**
+     * 读
+     */
+    public static void read()
+    {
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                log.debug("尝试获取读锁");
+                lock.readLock().lock();
+                log.debug("获取到读锁");
+                try
+                {
+                    Thread.sleep(1000);
+                }
+                catch (InterruptedException e)
+                {
+                    e.printStackTrace();
+                }
+                finally
+                {
+                    log.debug("释放读锁");
+                    lock.readLock().unlock();
+                }
+            }
+        }, "read:" + UUID.randomUUID().toString().substring(0, 6)).start();
+    }
+
+    /**
+     * 写
+     */
+    public static void write()
+    {
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                log.debug("尝试获取写锁");
+                lock.writeLock().lock();
+                log.debug("获取到写锁");
+                try
+                {
+                    Thread.sleep(1000);
+                }
+                catch (InterruptedException e)
+                {
+                    e.printStackTrace();
+                }
+                finally
+                {
+                    log.debug("释放写锁");
+                    lock.writeLock().unlock();
+                }
+            }
+        }, "write:" + UUID.randomUUID().toString().substring(0, 6)).start();
+    }
+
+    public static void main(String[] args)
+    {
+        read();
+        read();
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-12  13:21:00.535  [read:e4ceae] DEBUG mao.t1.Test:  尝试获取读锁
+2022-09-12  13:21:00.535  [read:a37d09] DEBUG mao.t1.Test:  尝试获取读锁
+2022-09-12  13:21:00.537  [read:a37d09] DEBUG mao.t1.Test:  获取到读锁
+2022-09-12  13:21:00.537  [read:e4ceae] DEBUG mao.t1.Test:  获取到读锁
+2022-09-12  13:21:01.545  [read:a37d09] DEBUG mao.t1.Test:  释放读锁
+2022-09-12  13:21:01.545  [read:e4ceae] DEBUG mao.t1.Test:  释放读锁
+```
+
+
+
+读-写 不可以并发
+
+
+
+```java
+package mao.t1;
+
+import org.apache.logging.log4j.core.util.UuidUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.UUID;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+
+/**
+ * Project name(项目名称)：java并发编程_ReentrantReadWriteLock
+ * Package(包名): mao.t1
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/12
+ * Time(创建时间)： 13:08
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 锁
+     */
+    private static final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
+
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    /**
+     * 读
+     */
+    public static void read()
+    {
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                log.debug("尝试获取读锁");
+                lock.readLock().lock();
+                log.debug("获取到读锁");
+                try
+                {
+                    Thread.sleep(1000);
+                }
+                catch (InterruptedException e)
+                {
+                    e.printStackTrace();
+                }
+                finally
+                {
+                    log.debug("释放读锁");
+                    lock.readLock().unlock();
+                }
+            }
+        }, "read:" + UUID.randomUUID().toString().substring(0, 6)).start();
+    }
+
+    /**
+     * 写
+     */
+    public static void write()
+    {
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                log.debug("尝试获取写锁");
+                lock.writeLock().lock();
+                log.debug("获取到写锁");
+                try
+                {
+                    Thread.sleep(1000);
+                }
+                catch (InterruptedException e)
+                {
+                    e.printStackTrace();
+                }
+                finally
+                {
+                    log.debug("释放写锁");
+                    lock.writeLock().unlock();
+                }
+            }
+        }, "write:" + UUID.randomUUID().toString().substring(0, 6)).start();
+    }
+
+    public static void main(String[] args)
+    {
+        read();
+        write();
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-12  13:22:22.602  [write:fd3175] DEBUG mao.t1.Test:  尝试获取写锁
+2022-09-12  13:22:22.602  [read:9213c5] DEBUG mao.t1.Test:  尝试获取读锁
+2022-09-12  13:22:22.605  [write:fd3175] DEBUG mao.t1.Test:  获取到写锁
+2022-09-12  13:22:23.618  [write:fd3175] DEBUG mao.t1.Test:  释放写锁
+2022-09-12  13:22:23.618  [read:9213c5] DEBUG mao.t1.Test:  获取到读锁
+2022-09-12  13:22:24.618  [read:9213c5] DEBUG mao.t1.Test:  释放读锁
+```
+
+```sh
+2022-09-12  13:23:46.964  [read:48e81e] DEBUG mao.t1.Test:  尝试获取读锁
+2022-09-12  13:23:46.964  [write:9ee7ba] DEBUG mao.t1.Test:  尝试获取写锁
+2022-09-12  13:23:46.966  [read:48e81e] DEBUG mao.t1.Test:  获取到读锁
+2022-09-12  13:23:47.971  [read:48e81e] DEBUG mao.t1.Test:  释放读锁
+2022-09-12  13:23:47.971  [write:9ee7ba] DEBUG mao.t1.Test:  获取到写锁
+2022-09-12  13:23:48.973  [write:9ee7ba] DEBUG mao.t1.Test:  释放写锁
+```
+
+
+
+
+
+写-写 不可以并发
+
+
+
+```java
+package mao.t1;
+
+import org.apache.logging.log4j.core.util.UuidUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.UUID;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+
+/**
+ * Project name(项目名称)：java并发编程_ReentrantReadWriteLock
+ * Package(包名): mao.t1
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/12
+ * Time(创建时间)： 13:08
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 锁
+     */
+    private static final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
+
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    /**
+     * 读
+     */
+    public static void read()
+    {
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                log.debug("尝试获取读锁");
+                lock.readLock().lock();
+                log.debug("获取到读锁");
+                try
+                {
+                    Thread.sleep(1000);
+                }
+                catch (InterruptedException e)
+                {
+                    e.printStackTrace();
+                }
+                finally
+                {
+                    log.debug("释放读锁");
+                    lock.readLock().unlock();
+                }
+            }
+        }, "read:" + UUID.randomUUID().toString().substring(0, 6)).start();
+    }
+
+    /**
+     * 写
+     */
+    public static void write()
+    {
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                log.debug("尝试获取写锁");
+                lock.writeLock().lock();
+                log.debug("获取到写锁");
+                try
+                {
+                    Thread.sleep(1000);
+                }
+                catch (InterruptedException e)
+                {
+                    e.printStackTrace();
+                }
+                finally
+                {
+                    log.debug("释放写锁");
+                    lock.writeLock().unlock();
+                }
+            }
+        }, "write:" + UUID.randomUUID().toString().substring(0, 6)).start();
+    }
+
+    public static void main(String[] args)
+    {
+        write();
+        write();
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-12  13:25:02.357  [write:238465] DEBUG mao.t1.Test:  尝试获取写锁
+2022-09-12  13:25:02.357  [write:e37f08] DEBUG mao.t1.Test:  尝试获取写锁
+2022-09-12  13:25:02.359  [write:e37f08] DEBUG mao.t1.Test:  获取到写锁
+2022-09-12  13:25:03.373  [write:e37f08] DEBUG mao.t1.Test:  释放写锁
+2022-09-12  13:25:03.373  [write:238465] DEBUG mao.t1.Test:  获取到写锁
+2022-09-12  13:25:04.382  [write:238465] DEBUG mao.t1.Test:  释放写锁
+```
+
+
+
 
 
