@@ -23906,3 +23906,91 @@ public class Test
 
 #### 读写锁原理
 
+读写锁用的是同一个 Sycn 同步器，因此等待队列、state 等也是同一个
+
+ t1执行 w.lock，t1 成功上锁，流程与 ReentrantLock 加锁相比没有特殊之处，不同是写锁状态占了 state 的低 16 位，而读锁 使用的是 state 的高 16 位
+
+
+
+![image-20220912134758424](img/java并发编程学习笔记/image-20220912134758424.png)
+
+
+
+t2 执行 r.lock，这时进入读锁的 sync.acquireShared(1) 流程，首先会进入 tryAcquireShared 流程。如果有写锁占据，那么 tryAcquireShared 返回 -1 表示失败
+
+* -1 表示失败
+* 0 表示成功，但后继节点不会继续唤醒
+* 正数表示成功，而且数值是还有几个后继节点需要唤醒，读写锁返回 1
+
+
+
+![image-20220912135025879](img/java并发编程学习笔记/image-20220912135025879.png)
+
+
+
+这时会进入 sync.doAcquireShared(1) 流程，首先也是调用 addWaiter 添加节点，不同之处在于节点被设置为 Node.SHARED 模式而非 Node.EXCLUSIVE 模式，注意此时 t2 仍处于活跃状态
+
+
+
+![image-20220912135131364](img/java并发编程学习笔记/image-20220912135131364.png)
+
+
+
+t2 会看看自己的节点是不是第二个，如果是，还会再次调用 tryAcquireShared(1) 来尝试获取锁
+
+
+
+如果没有成功，在 doAcquireShared 内 for (;;) 循环一次，把前驱节点的 waitStatus 改为 -1，再 for (;;) 循环一 次尝试 tryAcquireShared(1) 如果还不成功，那么在 parkAndCheckInterrupt() 处 park
+
+
+
+![image-20220912135304562](img/java并发编程学习笔记/image-20220912135304562.png)
+
+
+
+
+
+假设又有 t3 加读锁和 t4 加写锁，这期间 t1 仍然持有锁，就变成了下面的样子
+
+
+
+![image-20220912135411707](img/java并发编程学习笔记/image-20220912135411707.png)
+
+
+
+t1 w.unlock，这时会走到写锁的 sync.release(1) 流程，调用 sync.tryRelease(1) 成功
+
+
+
+![image-20220912135532893](img/java并发编程学习笔记/image-20220912135532893.png)
+
+
+
+接下来执行唤醒流程 sync.unparkSuccessor，即让第二个节点恢复运行，这时 t2 在 doAcquireShared 内 parkAndCheckInterrupt() 处恢复运行
+
+这回再来一次 for (;;) 执行 tryAcquireShared 成功则让读锁计数加一
+
+
+
+![image-20220912135707664](img/java并发编程学习笔记/image-20220912135707664.png)
+
+
+
+
+
+这时 t2 已经恢复运行，接下来 t2 调用 setHeadAndPropagate(node, 1)，它原本所在节点被置为头节点
+
+
+
+![image-20220912135858992](img/java并发编程学习笔记/image-20220912135858992.png)
+
+
+
+在 setHeadAndPropagate 方法内还会检查下一个节点是否是 shared，如果是则调用 doReleaseShared() 将 head 的状态从 -1 改为 0 并唤醒第二个节点，这时 t3 在 doAcquireShared 内 parkAndCheckInterrupt() 处恢复运行
+
+
+
+![image-20220912140258831](img/java并发编程学习笔记/image-20220912140258831.png)
+
+
+
