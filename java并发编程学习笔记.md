@@ -25098,3 +25098,283 @@ public class Test4
 
 ### Semaphore
 
+信号量，用来限制能同时访问共享资源的线程上限
+
+
+
+#### 使用
+
+
+
+```java
+package mao.t1;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.Semaphore;
+
+/**
+ * Project name(项目名称)：java并发编程_Semaphore
+ * Package(包名): mao.t1
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/13
+ * Time(创建时间)： 18:42
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 信号量
+     */
+    private static final Semaphore semaphore = new Semaphore(3);
+
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args)
+    {
+        for (int i = 0; i < 20; i++)
+        {
+            int finalI = i;
+            new Thread(new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    try
+                    {
+                        //获取一个许可
+                        semaphore.acquire();
+                        log.debug("线程" + (finalI + 1) + "开始运行");
+                        Thread.sleep(1000);
+                        log.debug("线程" + (finalI + 1) + "运行结束");
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                    finally
+                    {
+                        //释放许可
+                        semaphore.release();
+                    }
+                }
+            }, "t" + (i + 1)).start();
+        }
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-13  18:49:31.106  [t3] DEBUG mao.t1.Test:  线程3开始运行
+2022-09-13  18:49:31.106  [t2] DEBUG mao.t1.Test:  线程2开始运行
+2022-09-13  18:49:31.106  [t1] DEBUG mao.t1.Test:  线程1开始运行
+2022-09-13  18:49:32.116  [t2] DEBUG mao.t1.Test:  线程2运行结束
+2022-09-13  18:49:32.116  [t3] DEBUG mao.t1.Test:  线程3运行结束
+2022-09-13  18:49:32.116  [t1] DEBUG mao.t1.Test:  线程1运行结束
+2022-09-13  18:49:32.116  [t6] DEBUG mao.t1.Test:  线程6开始运行
+2022-09-13  18:49:32.116  [t5] DEBUG mao.t1.Test:  线程5开始运行
+2022-09-13  18:49:32.116  [t7] DEBUG mao.t1.Test:  线程7开始运行
+2022-09-13  18:49:33.124  [t7] DEBUG mao.t1.Test:  线程7运行结束
+2022-09-13  18:49:33.124  [t5] DEBUG mao.t1.Test:  线程5运行结束
+2022-09-13  18:49:33.124  [t6] DEBUG mao.t1.Test:  线程6运行结束
+2022-09-13  18:49:33.124  [t4] DEBUG mao.t1.Test:  线程4开始运行
+2022-09-13  18:49:33.124  [t8] DEBUG mao.t1.Test:  线程8开始运行
+2022-09-13  18:49:33.124  [t9] DEBUG mao.t1.Test:  线程9开始运行
+2022-09-13  18:49:34.136  [t8] DEBUG mao.t1.Test:  线程8运行结束
+2022-09-13  18:49:34.136  [t4] DEBUG mao.t1.Test:  线程4运行结束
+2022-09-13  18:49:34.136  [t9] DEBUG mao.t1.Test:  线程9运行结束
+2022-09-13  18:49:34.136  [t10] DEBUG mao.t1.Test:  线程10开始运行
+2022-09-13  18:49:34.136  [t11] DEBUG mao.t1.Test:  线程11开始运行
+2022-09-13  18:49:34.136  [t12] DEBUG mao.t1.Test:  线程12开始运行
+2022-09-13  18:49:35.144  [t10] DEBUG mao.t1.Test:  线程10运行结束
+2022-09-13  18:49:35.144  [t11] DEBUG mao.t1.Test:  线程11运行结束
+2022-09-13  18:49:35.144  [t12] DEBUG mao.t1.Test:  线程12运行结束
+2022-09-13  18:49:35.144  [t13] DEBUG mao.t1.Test:  线程13开始运行
+2022-09-13  18:49:35.144  [t14] DEBUG mao.t1.Test:  线程14开始运行
+2022-09-13  18:49:35.144  [t15] DEBUG mao.t1.Test:  线程15开始运行
+2022-09-13  18:49:36.150  [t13] DEBUG mao.t1.Test:  线程13运行结束
+2022-09-13  18:49:36.150  [t15] DEBUG mao.t1.Test:  线程15运行结束
+2022-09-13  18:49:36.150  [t14] DEBUG mao.t1.Test:  线程14运行结束
+2022-09-13  18:49:36.150  [t16] DEBUG mao.t1.Test:  线程16开始运行
+2022-09-13  18:49:36.150  [t19] DEBUG mao.t1.Test:  线程19开始运行
+2022-09-13  18:49:36.150  [t18] DEBUG mao.t1.Test:  线程18开始运行
+2022-09-13  18:49:37.159  [t18] DEBUG mao.t1.Test:  线程18运行结束
+2022-09-13  18:49:37.159  [t16] DEBUG mao.t1.Test:  线程16运行结束
+2022-09-13  18:49:37.159  [t19] DEBUG mao.t1.Test:  线程19运行结束
+2022-09-13  18:49:37.159  [t20] DEBUG mao.t1.Test:  线程20开始运行
+2022-09-13  18:49:37.159  [t17] DEBUG mao.t1.Test:  线程17开始运行
+2022-09-13  18:49:38.170  [t20] DEBUG mao.t1.Test:  线程20运行结束
+2022-09-13  18:49:38.170  [t17] DEBUG mao.t1.Test:  线程17运行结束
+```
+
+
+
+
+
+#### 简单连接池Semaphore实现
+
+
+
+```java
+package mao.t2;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.sql.Connection;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicIntegerArray;
+
+/**
+ * Project name(项目名称)：java并发编程_Semaphore
+ * Package(包名): mao.t2
+ * Class(类名): Pool
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/13
+ * Time(创建时间)： 18:53
+ * Version(版本): 1.0
+ * Description(描述)： 用 Semaphore 实现简单连接池。线程数和数据库连接数是相等的
+ */
+
+public class Pool
+{
+    /**
+     * 池大小
+     */
+    private final int poolSize;
+
+    /**
+     * 连接对象数组
+     */
+    private final Connection[] connections;
+
+    /**
+     * 连接状态数组 0 表示空闲， 1 表示繁忙
+     */
+    private final AtomicIntegerArray states;
+
+    /**
+     * 信号量
+     */
+    private final Semaphore semaphore;
+
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Pool.class);
+
+    /**
+     * 构造方法
+     *
+     * @param poolSize 池大小
+     */
+    public Pool(int poolSize)
+    {
+        if (poolSize <= 0)
+        {
+            throw new IllegalArgumentException("poolSize must >0");
+        }
+        this.poolSize = poolSize;
+        this.semaphore = new Semaphore(poolSize);
+        this.connections = new Connection[poolSize];
+        this.states = new AtomicIntegerArray(new int[poolSize]);
+        for (int i = 0; i < poolSize; i++)
+        {
+            connections[i] = new MockConnection("连接" + (i + 1));
+        }
+    }
+
+    /**
+     * 借连接
+     *
+     * @return {@link Connection}
+     */
+    public Connection borrow()
+    {
+        try
+        {
+            //获取许可
+            semaphore.acquire();
+            for (int i = 0; i < poolSize; i++)
+            {
+                //遍历是否有空闲的连接
+                if (states.get(i) == 0)
+                {
+                    while (true)
+                    {
+                        if (states.compareAndSet(i, 0, 1))
+                        {
+                            log.debug("获取连接：" + connections[i]);
+                            return connections[i];
+                        }
+                        Thread.yield();
+                    }
+                }
+            }
+        }
+        catch (InterruptedException e)
+        {
+            e.printStackTrace();
+            return null;
+        }
+        return null;
+    }
+
+
+    /**
+     * 归还连接
+     *
+     * @param connection 连接
+     */
+    public void free(Connection connection)
+    {
+        try
+        {
+            for (int i = 0; i < poolSize; i++)
+            {
+                if (connections[i] == connection)
+                {
+                    states.set(i, 0);
+                    log.debug("归还连接：" + connection);
+                    break;
+                }
+            }
+        }
+        finally
+        {
+            //释放许可
+            semaphore.release();
+        }
+
+
+    }
+
+}
+
+class MockConnection implements Connection
+{
+    //todo
+}
+```
+
+
+
+
+
+####  Semaphore 原理
+
