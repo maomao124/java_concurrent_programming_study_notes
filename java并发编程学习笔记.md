@@ -24458,3 +24458,643 @@ public class NonfairSync extends Sync
 
 #### StampedLock
 
+该类自 JDK 8 加入，是为了进一步优化读性能，它的特点是在使用读锁、写锁时都必须配合戳使用
+
+
+
+加解读锁：
+
+```
+long stamp = lock.readLock();
+lock.unlockRead(stamp);
+```
+
+
+
+加解写锁：
+
+```
+long stamp = lock.writeLock();
+lock.unlockWrite(stamp);
+```
+
+
+
+乐观读，StampedLock 支持 tryOptimisticRead() 方法（乐观读），读取完毕后需要做一次 戳校验 如果校验通 过，表示这期间确实没有写操作，数据可以安全使用，如果校验没通过，需要重新获取读锁，保证数据安全
+
+```
+long stamp = lock.tryOptimisticRead();
+// 验戳
+if(!lock.validate(stamp))
+{
+ // 锁升级
+}
+
+```
+
+
+
+
+
+测试两个读
+
+```java
+package mao.t1;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.locks.StampedLock;
+
+/**
+ * Project name(项目名称)：java并发编程_StampedLock
+ * Package(包名): mao.t1
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/13
+ * Time(创建时间)： 11:00
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    /**
+     * 数据
+     */
+    private int data;
+
+    /**
+     * StampedLock
+     */
+    private final StampedLock stampedLock = new StampedLock();
+
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    /**
+     * Instantiates a new Test.
+     *
+     * @param data the data
+     */
+    public Test(int data)
+    {
+        this.data = data;
+    }
+
+    /**
+     * 睡眠
+     *
+     * @param time 时间
+     */
+    private static void sleep(long time)
+    {
+        try
+        {
+            Thread.sleep(time);
+        }
+        catch (InterruptedException e)
+        {
+            e.printStackTrace();
+        }
+    }
+
+
+    /**
+     * 读
+     *
+     * @param sleepTime 睡眠时间
+     * @return int
+     */
+    public int read(int sleepTime)
+    {
+        long read = stampedLock.tryOptimisticRead();
+        sleep(sleepTime);
+        //验证
+        if (stampedLock.validate(read))
+        {
+            log.debug("直接返回数据，" + read);
+            return data;
+        }
+        //验证失败
+        //锁升级
+        log.debug("锁升级为读锁，尝试获取读锁");
+        long readLock = stampedLock.readLock();
+        try
+        {
+            log.debug("读锁获取成功，" + readLock);
+            sleep(sleepTime);
+            return data;
+        }
+        finally
+        {
+            log.debug("释放读锁");
+            stampedLock.unlockRead(readLock);
+        }
+    }
+
+
+    /**
+     * 写
+     *
+     * @param newData   新数据
+     * @param sleepTime 睡眠时间
+     */
+    public void write(int newData, int sleepTime)
+    {
+        //获取写锁
+        log.debug("尝试获取写锁");
+        long writeLock = stampedLock.writeLock();
+        try
+        {
+            log.debug("获取写锁成功");
+            sleep(sleepTime);
+            this.data = newData;
+        }
+        finally
+        {
+            log.debug("释放写锁");
+            stampedLock.unlockWrite(writeLock);
+        }
+    }
+
+
+    /**
+     * main方法
+     *
+     * @param args 参数
+     */
+    public static void main(String[] args)
+    {
+        Test t = new Test(10);
+
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                int read = t.read(30);
+                log.debug("结果：" + read);
+            }
+        }, "read1").start();
+
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                int read = t.read(30);
+                log.debug("结果：" + read);
+            }
+        }, "read2").start();
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-13  11:21:52.181  [read1] DEBUG mao.t1.Test:  直接返回数据，256
+2022-09-13  11:21:52.183  [read1] DEBUG mao.t1.Test:  结果：10
+2022-09-13  11:21:52.192  [read2] DEBUG mao.t1.Test:  直接返回数据，256
+2022-09-13  11:21:52.193  [read2] DEBUG mao.t1.Test:  结果：10
+```
+
+
+
+
+
+测试读写
+
+
+
+```java
+package mao.t1;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Project name(项目名称)：java并发编程_StampedLock
+ * Package(包名): mao.t1
+ * Class(类名): Test2
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/13
+ * Time(创建时间)： 11:22
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test2
+{
+    private static final Logger log = LoggerFactory.getLogger(Test2.class);
+
+    public static void main(String[] args)
+    {
+        Test t = new Test(10);
+
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                t.write(20,500);
+            }
+        }, "write").start();
+
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                int read = t.read(500);
+                log.debug("结果：" + read);
+            }
+        }, "read").start();
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-13  12:50:54.500  [write] DEBUG mao.t1.Test:  尝试获取写锁
+2022-09-13  12:50:54.502  [write] DEBUG mao.t1.Test:  获取写锁成功
+2022-09-13  12:50:55.002  [read] DEBUG mao.t1.Test:  锁升级为读锁，尝试获取读锁
+2022-09-13  12:50:55.004  [write] DEBUG mao.t1.Test:  释放写锁
+2022-09-13  12:50:55.006  [read] DEBUG mao.t1.Test:  读锁获取成功，513
+2022-09-13  12:50:55.509  [read] DEBUG mao.t1.Test:  释放读锁
+2022-09-13  12:50:55.509  [read] DEBUG mao.t1.Test2:  结果：20
+```
+
+```sh
+2022-09-13  12:52:25.510  [write] DEBUG mao.t1.Test:  尝试获取写锁
+2022-09-13  12:52:25.512  [write] DEBUG mao.t1.Test:  获取写锁成功
+2022-09-13  12:52:26.016  [write] DEBUG mao.t1.Test:  释放写锁
+2022-09-13  12:52:26.016  [read] DEBUG mao.t1.Test:  锁升级为读锁，尝试获取读锁
+2022-09-13  12:52:26.019  [read] DEBUG mao.t1.Test:  读锁获取成功，513
+2022-09-13  12:52:26.524  [read] DEBUG mao.t1.Test:  释放读锁
+2022-09-13  12:52:26.524  [read] DEBUG mao.t1.Test2:  结果：20
+```
+
+
+
+```java
+package mao.t1;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Project name(项目名称)：java并发编程_StampedLock
+ * Package(包名): mao.t1
+ * Class(类名): Test2
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/13
+ * Time(创建时间)： 11:22
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test2
+{
+    private static final Logger log = LoggerFactory.getLogger(Test2.class);
+
+    public static void main(String[] args) throws InterruptedException
+    {
+        Test t = new Test(10);
+
+
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                int read = t.read(500);
+                log.debug("结果：" + read);
+            }
+        }, "read").start();
+
+        Thread.sleep(400);
+
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                t.write(20,500);
+            }
+        }, "write").start();
+    }
+}
+```
+
+
+
+```sh
+2022-09-13  12:56:09.946  [write] DEBUG mao.t1.Test:  尝试获取写锁
+2022-09-13  12:56:09.948  [write] DEBUG mao.t1.Test:  获取写锁成功
+2022-09-13  12:56:10.035  [read] DEBUG mao.t1.Test:  锁升级为读锁，尝试获取读锁
+2022-09-13  12:56:10.451  [write] DEBUG mao.t1.Test:  释放写锁
+2022-09-13  12:56:10.453  [read] DEBUG mao.t1.Test:  读锁获取成功，513
+2022-09-13  12:56:10.957  [read] DEBUG mao.t1.Test:  释放读锁
+2022-09-13  12:56:10.957  [read] DEBUG mao.t1.Test2:  结果：20
+```
+
+
+
+```java
+package mao.t1;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Project name(项目名称)：java并发编程_StampedLock
+ * Package(包名): mao.t1
+ * Class(类名): Test2
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/13
+ * Time(创建时间)： 11:22
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test2
+{
+    private static final Logger log = LoggerFactory.getLogger(Test2.class);
+
+    public static void main(String[] args) throws InterruptedException
+    {
+        Test t = new Test(10);
+
+
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                int read = t.read(500);
+                log.debug("结果：" + read);
+            }
+        }, "read").start();
+
+        Thread.sleep(600);
+
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                t.write(20,500);
+            }
+        }, "write").start();
+    }
+}
+```
+
+
+
+```sh
+2022-09-13  12:57:27.570  [read] DEBUG mao.t1.Test:  直接返回数据，256
+2022-09-13  12:57:27.572  [read] DEBUG mao.t1.Test2:  结果：10
+2022-09-13  12:57:27.658  [write] DEBUG mao.t1.Test:  尝试获取写锁
+2022-09-13  12:57:27.658  [write] DEBUG mao.t1.Test:  获取写锁成功
+2022-09-13  12:57:28.164  [write] DEBUG mao.t1.Test:  释放写锁
+```
+
+
+
+
+
+测试两个写
+
+```java
+package mao.t1;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Project name(项目名称)：java并发编程_StampedLock
+ * Package(包名): mao.t1
+ * Class(类名): Test3
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/13
+ * Time(创建时间)： 12:59
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test3
+{
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test3.class);
+
+    public static void main(String[] args)
+    {
+        Test t = new Test(10);
+
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                t.write(20, 500);
+            }
+        }, "write1").start();
+
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                t.write(30, 500);
+            }
+        }, "write2").start();
+
+        log.debug("结果：" + t.read(10));
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-13  13:04:09.981  [write1] DEBUG mao.t1.Test:  尝试获取写锁
+2022-09-13  13:04:09.981  [write2] DEBUG mao.t1.Test:  尝试获取写锁
+2022-09-13  13:04:09.983  [write1] DEBUG mao.t1.Test:  获取写锁成功
+2022-09-13  13:04:09.999  [main] DEBUG mao.t1.Test:  锁升级为读锁，尝试获取读锁
+2022-09-13  13:04:10.490  [write1] DEBUG mao.t1.Test:  释放写锁
+2022-09-13  13:04:10.490  [write2] DEBUG mao.t1.Test:  获取写锁成功
+2022-09-13  13:04:10.998  [write2] DEBUG mao.t1.Test:  释放写锁
+2022-09-13  13:04:11.001  [main] DEBUG mao.t1.Test:  读锁获取成功，769
+2022-09-13  13:04:11.013  [main] DEBUG mao.t1.Test:  释放读锁
+2022-09-13  13:04:11.013  [main] DEBUG mao.t1.Test3:  结果：30
+```
+
+
+
+
+
+* StampedLock 不支持条件变量
+* StampedLock 不支持可重入
+
+
+
+
+
+测试写锁重入
+
+
+
+```java
+package mao.t1;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.locks.StampedLock;
+
+/**
+ * Project name(项目名称)：java并发编程_StampedLock
+ * Package(包名): mao.t1
+ * Class(类名): Test4
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/13
+ * Time(创建时间)： 13:06
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test4
+{
+
+    /**
+     * 锁
+     */
+    private static final StampedLock stampedLock = new StampedLock();
+
+    private static final Logger log = LoggerFactory.getLogger(Test4.class);
+
+    public static void main(String[] args)
+    {
+        m1();
+    }
+
+    private static void m1()
+    {
+        log.debug("尝试获取写锁");
+        long writeLock = stampedLock.writeLock();
+        try
+        {
+            log.debug("获取写锁成功");
+            try
+            {
+                Thread.sleep(200);
+                m2();
+            }
+            catch (InterruptedException e)
+            {
+                e.printStackTrace();
+            }
+        }
+        finally
+        {
+            log.debug("释放写锁");
+            stampedLock.unlockWrite(writeLock);
+        }
+    }
+
+    private static void m2()
+    {
+        log.debug("尝试获取写锁");
+        long writeLock = stampedLock.writeLock();
+        try
+        {
+            log.debug("获取写锁成功");
+            try
+            {
+                Thread.sleep(200);
+                m3();
+            }
+            catch (InterruptedException e)
+            {
+                e.printStackTrace();
+            }
+        }
+        finally
+        {
+            log.debug("释放写锁");
+            stampedLock.unlockWrite(writeLock);
+        }
+    }
+
+    private static void m3()
+    {
+        log.debug("尝试获取写锁");
+        long writeLock = stampedLock.writeLock();
+        try
+        {
+            log.debug("获取写锁成功");
+            try
+            {
+                Thread.sleep(200);
+            }
+            catch (InterruptedException e)
+            {
+                e.printStackTrace();
+            }
+        }
+        finally
+        {
+            log.debug("释放写锁");
+            stampedLock.unlockWrite(writeLock);
+        }
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-13  13:13:02.555  [main] DEBUG mao.t1.Test4:  尝试获取写锁
+2022-09-13  13:13:02.557  [main] DEBUG mao.t1.Test4:  获取写锁成功
+2022-09-13  13:13:02.764  [main] DEBUG mao.t1.Test4:  尝试获取写锁
+...
+```
+
+
+
+
+
+
+
+
+
+### Semaphore
+
