@@ -25378,3 +25378,45 @@ class MockConnection implements Connection
 
 ####  Semaphore 原理
 
+Semaphore 有点像一个停车场，permits 就好像停车位数量，当线程获得了 permits 就像是获得了停车位，然后 停车场显示空余车位减一
+
+
+
+刚开始，permits（state）为 3，这时 5 个线程来获取资源：
+
+
+
+![image-20220913191455751](img/java并发编程学习笔记/image-20220913191455751.png)
+
+
+
+假设其中 Thread-1，Thread-2，Thread-4 cas 竞争成功，而 Thread-0 和 Thread-3 竞争失败，进入 AQS 队列 park 阻塞
+
+
+
+![image-20220913191625081](img/java并发编程学习笔记/image-20220913191625081.png)
+
+
+
+这时 Thread-4 释放了 permits，状态如下
+
+
+
+![image-20220913191707772](img/java并发编程学习笔记/image-20220913191707772.png)
+
+
+
+接下来 Thread-0 竞争成功，permits 再次设置为 0，设置自己为 head 节点，断开原来的 head 节点，unpark 接 下来的 Thread-3 节点，但由于 permits 是 0，因此 Thread-3 在尝试不成功后再次进入 park 状态
+
+
+
+![image-20220913191916405](img/java并发编程学习笔记/image-20220913191916405.png)
+
+
+
+
+
+
+
+### CountdownLatch
+
