@@ -25803,3 +25803,310 @@ public class Test
 
 ### CyclicBarrier
 
+循环栅栏，用来进行线程协作，等待线程满足某个计数。构造时设置**计数个数**，每个线程执 行到某个需要“同步”的时刻调用 await() 方法进行等待，当等待的线程数满足**计数个数**时，继续执行
+
+
+
+```java
+package mao.t1;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.BrokenBarrierException;
+import java.util.concurrent.CyclicBarrier;
+
+/**
+ * Project name(项目名称)：java并发编程_CyclicBarrier
+ * Package(包名): mao.t1
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/14
+ * Time(创建时间)： 12:43
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+
+    private static final CyclicBarrier cyclicBarrier = new CyclicBarrier(10);
+
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args)
+    {
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                try
+                {
+                    log.debug("线程0开始运行");
+                    cyclicBarrier.await();
+                    log.debug("------------> 满足条件，开始运行");
+                }
+                catch (InterruptedException | BrokenBarrierException e)
+                {
+                    e.printStackTrace();
+                }
+            }
+        }).start();
+
+
+        for (int i = 0; i < 15; i++)
+        {
+            int finalI = i;
+            new Thread(new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    try
+                    {
+                        log.debug("线程" + (finalI + 1) + "开始运行");
+                        cyclicBarrier.await();
+                        log.debug("线程" + (finalI + 1) + "结束运行");
+                    }
+                    catch (InterruptedException | BrokenBarrierException e)
+                    {
+                        e.printStackTrace();
+                    }
+                }
+            }).start();
+
+            try
+            {
+                Thread.sleep(500);
+            }
+            catch (InterruptedException e)
+            {
+                e.printStackTrace();
+            }
+        }
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-14  13:00:54.829  [Thread-0] DEBUG mao.t1.Test:  线程0开始运行
+2022-09-14  13:00:54.829  [Thread-1] DEBUG mao.t1.Test:  线程1开始运行
+2022-09-14  13:00:55.334  [Thread-2] DEBUG mao.t1.Test:  线程2开始运行
+2022-09-14  13:00:55.843  [Thread-3] DEBUG mao.t1.Test:  线程3开始运行
+2022-09-14  13:00:56.348  [Thread-4] DEBUG mao.t1.Test:  线程4开始运行
+2022-09-14  13:00:56.857  [Thread-5] DEBUG mao.t1.Test:  线程5开始运行
+2022-09-14  13:00:57.363  [Thread-6] DEBUG mao.t1.Test:  线程6开始运行
+2022-09-14  13:00:57.870  [Thread-7] DEBUG mao.t1.Test:  线程7开始运行
+2022-09-14  13:00:58.380  [Thread-8] DEBUG mao.t1.Test:  线程8开始运行
+2022-09-14  13:00:58.887  [Thread-9] DEBUG mao.t1.Test:  线程9开始运行
+2022-09-14  13:00:58.888  [Thread-0] DEBUG mao.t1.Test:  ------------> 满足条件，开始运行
+2022-09-14  13:00:58.888  [Thread-3] DEBUG mao.t1.Test:  线程3结束运行
+2022-09-14  13:00:58.888  [Thread-7] DEBUG mao.t1.Test:  线程7结束运行
+2022-09-14  13:00:58.888  [Thread-9] DEBUG mao.t1.Test:  线程9结束运行
+2022-09-14  13:00:58.888  [Thread-2] DEBUG mao.t1.Test:  线程2结束运行
+2022-09-14  13:00:58.888  [Thread-1] DEBUG mao.t1.Test:  线程1结束运行
+2022-09-14  13:00:58.888  [Thread-8] DEBUG mao.t1.Test:  线程8结束运行
+2022-09-14  13:00:58.888  [Thread-6] DEBUG mao.t1.Test:  线程6结束运行
+2022-09-14  13:00:58.888  [Thread-5] DEBUG mao.t1.Test:  线程5结束运行
+2022-09-14  13:00:58.888  [Thread-4] DEBUG mao.t1.Test:  线程4结束运行
+2022-09-14  13:00:59.393  [Thread-10] DEBUG mao.t1.Test:  线程10开始运行
+2022-09-14  13:00:59.898  [Thread-11] DEBUG mao.t1.Test:  线程11开始运行
+2022-09-14  13:01:00.406  [Thread-12] DEBUG mao.t1.Test:  线程12开始运行
+2022-09-14  13:01:00.912  [Thread-13] DEBUG mao.t1.Test:  线程13开始运行
+2022-09-14  13:01:01.419  [Thread-14] DEBUG mao.t1.Test:  线程14开始运行
+2022-09-14  13:01:01.923  [Thread-15] DEBUG mao.t1.Test:  线程15开始运行
+```
+
+
+
+
+
+
+
+```java
+package mao.t2;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.BrokenBarrierException;
+import java.util.concurrent.CyclicBarrier;
+
+/**
+ * Project name(项目名称)：java并发编程_CyclicBarrier
+ * Package(包名): mao.t2
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/14
+ * Time(创建时间)： 13:06
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    private static final CyclicBarrier cyclicBarrier = new CyclicBarrier(10);
+
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args)
+    {
+        for (int i = 0; i < 300; i++)
+        {
+            int finalI = i;
+            new Thread(new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    try
+                    {
+                        log.debug("线程" + (finalI + 1) + "开始运行");
+                        cyclicBarrier.await();
+                        if (finalI % 10 == 0)
+                        {
+                            log.info("----------------->满足条件，开始运行");
+                        }
+                        else
+                        {
+                            log.debug("线程" + (finalI + 1) + "结束运行");
+                        }
+                    }
+                    catch (InterruptedException | BrokenBarrierException e)
+                    {
+                        e.printStackTrace();
+                    }
+                }
+            }).start();
+
+            try
+            {
+                Thread.sleep(500);
+            }
+            catch (InterruptedException e)
+            {
+                e.printStackTrace();
+            }
+        }
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-14  13:08:12.608  [Thread-0] DEBUG mao.t2.Test:  线程1开始运行
+2022-09-14  13:08:13.117  [Thread-1] DEBUG mao.t2.Test:  线程2开始运行
+2022-09-14  13:08:13.621  [Thread-2] DEBUG mao.t2.Test:  线程3开始运行
+2022-09-14  13:08:14.128  [Thread-3] DEBUG mao.t2.Test:  线程4开始运行
+2022-09-14  13:08:14.633  [Thread-4] DEBUG mao.t2.Test:  线程5开始运行
+2022-09-14  13:08:15.141  [Thread-5] DEBUG mao.t2.Test:  线程6开始运行
+2022-09-14  13:08:15.646  [Thread-6] DEBUG mao.t2.Test:  线程7开始运行
+2022-09-14  13:08:16.152  [Thread-7] DEBUG mao.t2.Test:  线程8开始运行
+2022-09-14  13:08:16.658  [Thread-8] DEBUG mao.t2.Test:  线程9开始运行
+2022-09-14  13:08:17.164  [Thread-9] DEBUG mao.t2.Test:  线程10开始运行
+2022-09-14  13:08:17.165  [Thread-0] INFO  mao.t2.Test:  ----------------->满足条件，开始运行
+2022-09-14  13:08:17.165  [Thread-9] DEBUG mao.t2.Test:  线程10结束运行
+2022-09-14  13:08:17.165  [Thread-2] DEBUG mao.t2.Test:  线程3结束运行
+2022-09-14  13:08:17.165  [Thread-7] DEBUG mao.t2.Test:  线程8结束运行
+2022-09-14  13:08:17.165  [Thread-3] DEBUG mao.t2.Test:  线程4结束运行
+2022-09-14  13:08:17.165  [Thread-8] DEBUG mao.t2.Test:  线程9结束运行
+2022-09-14  13:08:17.165  [Thread-5] DEBUG mao.t2.Test:  线程6结束运行
+2022-09-14  13:08:17.165  [Thread-6] DEBUG mao.t2.Test:  线程7结束运行
+2022-09-14  13:08:17.165  [Thread-1] DEBUG mao.t2.Test:  线程2结束运行
+2022-09-14  13:08:17.165  [Thread-4] DEBUG mao.t2.Test:  线程5结束运行
+2022-09-14  13:08:17.670  [Thread-10] DEBUG mao.t2.Test:  线程11开始运行
+2022-09-14  13:08:18.176  [Thread-11] DEBUG mao.t2.Test:  线程12开始运行
+2022-09-14  13:08:18.684  [Thread-12] DEBUG mao.t2.Test:  线程13开始运行
+2022-09-14  13:08:19.194  [Thread-13] DEBUG mao.t2.Test:  线程14开始运行
+2022-09-14  13:08:19.701  [Thread-14] DEBUG mao.t2.Test:  线程15开始运行
+2022-09-14  13:08:20.211  [Thread-15] DEBUG mao.t2.Test:  线程16开始运行
+2022-09-14  13:08:20.720  [Thread-16] DEBUG mao.t2.Test:  线程17开始运行
+2022-09-14  13:08:21.226  [Thread-17] DEBUG mao.t2.Test:  线程18开始运行
+2022-09-14  13:08:21.733  [Thread-18] DEBUG mao.t2.Test:  线程19开始运行
+2022-09-14  13:08:22.242  [Thread-19] DEBUG mao.t2.Test:  线程20开始运行
+2022-09-14  13:08:22.242  [Thread-19] DEBUG mao.t2.Test:  线程20结束运行
+2022-09-14  13:08:22.242  [Thread-11] DEBUG mao.t2.Test:  线程12结束运行
+2022-09-14  13:08:22.242  [Thread-10] INFO  mao.t2.Test:  ----------------->满足条件，开始运行
+2022-09-14  13:08:22.242  [Thread-15] DEBUG mao.t2.Test:  线程16结束运行
+2022-09-14  13:08:22.242  [Thread-14] DEBUG mao.t2.Test:  线程15结束运行
+2022-09-14  13:08:22.242  [Thread-16] DEBUG mao.t2.Test:  线程17结束运行
+2022-09-14  13:08:22.242  [Thread-12] DEBUG mao.t2.Test:  线程13结束运行
+2022-09-14  13:08:22.242  [Thread-18] DEBUG mao.t2.Test:  线程19结束运行
+2022-09-14  13:08:22.242  [Thread-13] DEBUG mao.t2.Test:  线程14结束运行
+2022-09-14  13:08:22.242  [Thread-17] DEBUG mao.t2.Test:  线程18结束运行
+2022-09-14  13:08:22.749  [Thread-20] DEBUG mao.t2.Test:  线程21开始运行
+2022-09-14  13:08:23.254  [Thread-21] DEBUG mao.t2.Test:  线程22开始运行
+2022-09-14  13:08:23.763  [Thread-22] DEBUG mao.t2.Test:  线程23开始运行
+2022-09-14  13:08:24.269  [Thread-23] DEBUG mao.t2.Test:  线程24开始运行
+2022-09-14  13:08:24.778  [Thread-24] DEBUG mao.t2.Test:  线程25开始运行
+2022-09-14  13:08:25.284  [Thread-25] DEBUG mao.t2.Test:  线程26开始运行
+2022-09-14  13:08:25.792  [Thread-26] DEBUG mao.t2.Test:  线程27开始运行
+2022-09-14  13:08:26.299  [Thread-27] DEBUG mao.t2.Test:  线程28开始运行
+2022-09-14  13:08:26.810  [Thread-28] DEBUG mao.t2.Test:  线程29开始运行
+2022-09-14  13:08:27.315  [Thread-29] DEBUG mao.t2.Test:  线程30开始运行
+2022-09-14  13:08:27.316  [Thread-29] DEBUG mao.t2.Test:  线程30结束运行
+2022-09-14  13:08:27.316  [Thread-20] INFO  mao.t2.Test:  ----------------->满足条件，开始运行
+2022-09-14  13:08:27.316  [Thread-24] DEBUG mao.t2.Test:  线程25结束运行
+2022-09-14  13:08:27.316  [Thread-21] DEBUG mao.t2.Test:  线程22结束运行
+2022-09-14  13:08:27.316  [Thread-27] DEBUG mao.t2.Test:  线程28结束运行
+2022-09-14  13:08:27.316  [Thread-22] DEBUG mao.t2.Test:  线程23结束运行
+2022-09-14  13:08:27.316  [Thread-23] DEBUG mao.t2.Test:  线程24结束运行
+2022-09-14  13:08:27.316  [Thread-25] DEBUG mao.t2.Test:  线程26结束运行
+2022-09-14  13:08:27.316  [Thread-26] DEBUG mao.t2.Test:  线程27结束运行
+2022-09-14  13:08:27.316  [Thread-28] DEBUG mao.t2.Test:  线程29结束运行
+2022-09-14  13:08:27.822  [Thread-30] DEBUG mao.t2.Test:  线程31开始运行
+2022-09-14  13:08:28.329  [Thread-31] DEBUG mao.t2.Test:  线程32开始运行
+2022-09-14  13:08:28.837  [Thread-32] DEBUG mao.t2.Test:  线程33开始运行
+2022-09-14  13:08:29.346  [Thread-33] DEBUG mao.t2.Test:  线程34开始运行
+2022-09-14  13:08:29.854  [Thread-34] DEBUG mao.t2.Test:  线程35开始运行
+2022-09-14  13:08:30.361  [Thread-35] DEBUG mao.t2.Test:  线程36开始运行
+2022-09-14  13:08:30.867  [Thread-36] DEBUG mao.t2.Test:  线程37开始运行
+2022-09-14  13:08:31.371  [Thread-37] DEBUG mao.t2.Test:  线程38开始运行
+2022-09-14  13:08:31.878  [Thread-38] DEBUG mao.t2.Test:  线程39开始运行
+2022-09-14  13:08:32.387  [Thread-39] DEBUG mao.t2.Test:  线程40开始运行
+2022-09-14  13:08:32.387  [Thread-39] DEBUG mao.t2.Test:  线程40结束运行
+2022-09-14  13:08:32.387  [Thread-31] DEBUG mao.t2.Test:  线程32结束运行
+2022-09-14  13:08:32.387  [Thread-30] INFO  mao.t2.Test:  ----------------->满足条件，开始运行
+2022-09-14  13:08:32.387  [Thread-34] DEBUG mao.t2.Test:  线程35结束运行
+2022-09-14  13:08:32.387  [Thread-32] DEBUG mao.t2.Test:  线程33结束运行
+2022-09-14  13:08:32.387  [Thread-35] DEBUG mao.t2.Test:  线程36结束运行
+2022-09-14  13:08:32.387  [Thread-37] DEBUG mao.t2.Test:  线程38结束运行
+2022-09-14  13:08:32.387  [Thread-38] DEBUG mao.t2.Test:  线程39结束运行
+2022-09-14  13:08:32.387  [Thread-36] DEBUG mao.t2.Test:  线程37结束运行
+2022-09-14  13:08:32.387  [Thread-33] DEBUG mao.t2.Test:  线程34结束运行
+2022-09-14  13:08:32.896  [Thread-40] DEBUG mao.t2.Test:  线程41开始运行
+...
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+### 线程安全集合类
+
