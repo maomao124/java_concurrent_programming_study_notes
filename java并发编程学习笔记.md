@@ -26161,3 +26161,475 @@ public class Test
 
 
 
+```java
+package mao.t1;
+
+import java.io.*;
+import java.util.*;
+import java.util.function.BiConsumer;
+import java.util.function.Supplier;
+
+/**
+ * Project name(项目名称)：java并发编程_ConcurrentHashMap
+ * Package(包名): mao.t1
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/14
+ * Time(创建时间)： 13:24
+ * Version(版本): 1.0
+ * Description(描述)： 单词计数
+ */
+
+public class Test
+{
+    private static final String word = "abcedfghijklmnopqrstuvwxyz";
+
+    /**
+     * 写
+     */
+    @SuppressWarnings("all")
+    private static void write()
+    {
+        int length = word.length();
+        int count = 200;
+        List<String> list = new ArrayList<>(length * count);
+        //加入到集合中
+        for (int i = 0; i < length; i++)
+        {
+            char ch = word.charAt(i);
+            for (int j = 0; j < count; j++)
+            {
+                list.add(String.valueOf(ch));
+            }
+        }
+        //打乱
+        Collections.shuffle(list);
+
+        //写入到文件
+        for (int i = 0; i < 26; i++)
+        {
+            new File("./file/").mkdir();
+
+            File file = new File(".\\file\\" + (i + 1) + ".txt");
+            if (!file.exists())
+            {
+                try
+                {
+                    file.createNewFile();
+                }
+                catch (IOException e)
+                {
+                    e.printStackTrace();
+                }
+            }
+            try (PrintWriter out = new PrintWriter(
+                    new OutputStreamWriter(
+                            new FileOutputStream(file))))
+            {
+                String collect = String.join("\n", list.subList(i * count, (i + 1) * count));
+                out.print(collect);
+            }
+            catch (IOException ignored)
+            {
+                //ignored.printStackTrace();
+            }
+        }
+    }
+
+
+    /**
+     * 读
+     *
+     * @param supplier 供应商
+     * @param consumer 消费者
+     */
+    private static <V> void read(Supplier<Map<String, V>> supplier,
+                                 BiConsumer<Map<String, V>, List<String>> consumer)
+    {
+        Map<String, V> counterMap = supplier.get();
+        List<Thread> threads = new ArrayList<>();
+        for (int i = 1; i <= 26; i++)
+        {
+            int idx = i;
+            Thread thread = new Thread(() ->
+            {
+                List<String> words = readFromFile(idx);
+                //计数
+                consumer.accept(counterMap, words);
+            });
+            threads.add(thread);
+        }
+        threads.forEach(Thread::start);
+        threads.forEach(t ->
+        {
+            try
+            {
+                t.join();
+            }
+            catch (InterruptedException e)
+            {
+                e.printStackTrace();
+            }
+        });
+
+        //打印
+        Set<String> words = counterMap.keySet();
+        int i = 0;
+        for (String word : words)
+        {
+            System.out.print(word + "=" + counterMap.get(word) + "\t\t");
+            i++;
+            if (i % 3 == 0)
+            {
+                System.out.println();
+            }
+        }
+    }
+
+    /**
+     * 从文件读取
+     *
+     * @param i 文件序号
+     * @return {@link List}<{@link String}>
+     */
+    public static List<String> readFromFile(int i)
+    {
+        ArrayList<String> words = new ArrayList<>();
+        try (BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(new FileInputStream("./file/"
+                + i + ".txt"))))
+        {
+            while (true)
+            {
+                String word = bufferedReader.readLine();
+                if (word == null)
+                {
+                    break;
+                }
+                words.add(word);
+            }
+            return words;
+        }
+        catch (IOException e)
+        {
+            throw new RuntimeException(e);
+        }
+    }
+
+
+    public static void main(String[] args)
+    {
+        write();
+
+        long start = System.currentTimeMillis();
+
+        read(new Supplier<Map<String, Integer>>()
+        {
+            @Override
+            public Map<String, Integer> get()
+            {
+                return new HashMap<>();
+            }
+        }, new BiConsumer<Map<String, Integer>, List<String>>()
+        {
+            @Override
+            public void accept(Map<String, Integer> stringIntegerMap, List<String> strings)
+            {
+                for (String word : strings)
+                {
+                    Integer counter = stringIntegerMap.get(word);
+                    int newValue = counter == null ? 1 : counter + 1;
+                    stringIntegerMap.put(word, newValue);
+                }
+            }
+        });
+
+        Runtime.getRuntime().addShutdownHook(new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                System.out.println("\n");
+                long end = System.currentTimeMillis();
+                System.out.println("运行时间：" + (end - start) + "ms");
+            }
+        }));
+    }
+    
+}
+
+```
+
+
+
+参数：
+
+* 一是提供一个 map 集合，用来存放每个单词的计数结果，key 为单词，value 为计数
+* 二是提供一组操作，保证计数的安全性，会传递 map 集合以及单词 List
+
+
+
+运行结果：
+
+```sh
+a=190		b=194		c=194		
+d=194		e=194		f=193		
+g=195		h=191		i=192		
+j=180		k=196		l=192		
+m=192		n=190		o=191		
+p=193		q=195		r=197		
+s=195		t=194		u=195		
+v=195		w=195		x=191		
+y=190		z=197		
+
+运行时间：18ms
+```
+
+```sh
+a=197		b=195		c=194		
+d=197		e=194		f=195		
+g=194		h=195		i=196		
+j=199		k=196		l=194		
+m=197		n=198		o=193		
+p=196		q=184		r=187		
+s=191		t=194		u=197		
+v=189		w=192		x=144		
+y=194		z=192		
+
+运行时间：17ms
+```
+
+```sh
+a=192		b=195		c=193		
+d=194		e=189		f=192		
+g=190		h=192		i=194		
+j=191		k=195		l=191		
+m=195		n=196		o=193		
+p=195		q=196		r=194		
+s=194		t=192		u=175		
+v=196		w=198		x=194		
+y=197		z=191		
+
+运行时间：15ms
+```
+
+
+
+都小于200，正确结果应该都是200
+
+
+
+
+
+可以使用同步锁，但是会影响并发
+
+
+
+```java
+public static void main(String[] args)
+{
+    write();
+
+    long start = System.currentTimeMillis();
+
+    read(new Supplier<Map<String, Integer>>()
+    {
+        @Override
+        public Map<String, Integer> get()
+        {
+            return new HashMap<>();
+        }
+    }, new BiConsumer<Map<String, Integer>, List<String>>()
+    {
+        @Override
+        public void accept(Map<String, Integer> stringIntegerMap, List<String> strings)
+        {
+            synchronized (this)
+            {
+                for (String word : strings)
+                {
+                    Integer counter = stringIntegerMap.get(word);
+                    int newValue = counter == null ? 1 : counter + 1;
+                    stringIntegerMap.put(word, newValue);
+                }
+            }
+        }
+    });
+
+    Runtime.getRuntime().addShutdownHook(new Thread(new Runnable()
+    {
+        @Override
+        public void run()
+        {
+            System.out.println("\n");
+            long end = System.currentTimeMillis();
+            System.out.println("运行时间：" + (end - start) + "ms");
+        }
+    }));
+}
+```
+
+
+
+运行结果：
+
+```sh
+a=200		b=200		c=200		
+d=200		e=200		f=200		
+g=200		h=200		i=200		
+j=200		k=200		l=200		
+m=200		n=200		o=200		
+p=200		q=200		r=200		
+s=200		t=200		u=200		
+v=200		w=200		x=200		
+y=200		z=200		
+
+运行时间：17ms
+```
+
+
+
+
+
+解决方案二：使用原子变量
+
+
+
+```java
+public static void main(String[] args)
+{
+    write();
+
+    long start = System.currentTimeMillis();
+
+    read(new Supplier<Map<String, LongAdder>>()
+    {
+        @Override
+        public Map<String, LongAdder> get()
+        {
+            return new ConcurrentHashMap<>();
+        }
+    }, new BiConsumer<Map<String, LongAdder>, List<String>>()
+    {
+        @Override
+        public void accept(Map<String, LongAdder> stringIntegerMap, List<String> strings)
+        {
+            for (String word : strings)
+            {
+                stringIntegerMap.computeIfAbsent(word, (key) -> new LongAdder()).increment();
+            }
+        }
+    });
+
+    Runtime.getRuntime().addShutdownHook(new Thread(new Runnable()
+    {
+        @Override
+        public void run()
+        {
+            System.out.println("\n");
+            long end = System.currentTimeMillis();
+            System.out.println("运行时间：" + (end - start) + "ms");
+        }
+    }));
+}
+```
+
+
+
+运行结果：
+
+```sh
+a=200		b=200		c=200		
+d=200		e=200		f=200		
+g=200		h=200		i=200		
+j=200		k=200		l=200		
+m=200		n=200		o=200		
+p=200		q=200		r=200		
+s=200		t=200		u=200		
+v=200		w=200		x=200		
+y=200		z=200		
+
+运行时间：19ms
+```
+
+
+
+
+
+解决方案三：
+
+```java
+public static void main(String[] args)
+{
+    write();
+
+    long start = System.currentTimeMillis();
+
+    read(new Supplier<Map<String, Integer>>()
+    {
+        @Override
+        public Map<String, Integer> get()
+        {
+            return new ConcurrentHashMap<>();
+        }
+    }, new BiConsumer<Map<String, Integer>, List<String>>()
+    {
+        @Override
+        public void accept(Map<String, Integer> stringIntegerMap, List<String> strings)
+        {
+            for (String word : strings)
+            {
+                //stringIntegerMap.merge(word, 1, Integer::sum);
+                stringIntegerMap.merge(word, 1, new BinaryOperator<Integer>()
+                {
+                    @Override
+                    public Integer apply(Integer integer, Integer integer2)
+                    {
+                        //return integer+integer2;
+                        return Integer.sum(integer, integer2);
+                    }
+                });
+            }
+        }
+    });
+
+    Runtime.getRuntime().addShutdownHook(new Thread(new Runnable()
+    {
+        @Override
+        public void run()
+        {
+            System.out.println("\n");
+            long end = System.currentTimeMillis();
+            System.out.println("运行时间：" + (end - start) + "ms");
+        }
+    }));
+}
+```
+
+
+
+运行结果：
+
+```sh
+a=200		b=200		c=200		
+d=200		e=200		f=200		
+g=200		h=200		i=200		
+j=200		k=200		l=200		
+m=200		n=200		o=200		
+p=200		q=200		r=200		
+s=200		t=200		u=200		
+v=200		w=200		x=200		
+y=200		z=200		
+
+运行时间：17ms
+```
+
+
+
+
+
+
+
+##### 原理
+
