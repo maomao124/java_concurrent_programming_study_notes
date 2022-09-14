@@ -25406,7 +25406,7 @@ Semaphore 有点像一个停车场，permits 就好像停车位数量，当线�
 
 
 
-接下来 Thread-0 竞争成功，permits 再次设置为 0，设置自己为 head 节点，断开原来的 head 节点，unpark 接 下来的 Thread-3 节点，但由于 permits 是 0，因此 Thread-3 在尝试不成功后再次进入 park 状态
+接下来 Thread-0 竞争成功，permits 再次设置为 0，设置自己为 head 节点，断开原来的 head 节点，unpark 接下来的 Thread-3 节点，但由于 permits 是 0，因此 Thread-3 在尝试不成功后再次进入 park 状态
 
 
 
@@ -25419,4 +25419,387 @@ Semaphore 有点像一个停车场，permits 就好像停车位数量，当线�
 
 
 ### CountdownLatch
+
+用来进行线程同步协作，等待所有线程完成倒计时
+
+其中构造参数用来初始化等待计数值，await() 用来等待计数归零，countDown() 用来让计数减一
+
+
+
+#### 使用
+
+
+
+```java
+package mao.t1;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.CountDownLatch;
+
+/**
+ * Project name(项目名称)：java并发编程_CountdownLatch
+ * Package(包名): mao.t1
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/14
+ * Time(创建时间)： 12:10
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+
+    private static final CountDownLatch countDownLatch = new CountDownLatch(4);
+
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    /**
+     * 运行
+     *
+     * @param sleepTime 睡眠时间
+     */
+    public static void run(long sleepTime)
+    {
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                try
+                {
+                    log.debug("开始运行");
+                    try
+                    {
+                        Thread.sleep(sleepTime);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                }
+                finally
+                {
+                    log.debug("结束运行");
+                    countDownLatch.countDown();
+                }
+            }
+        }).start();
+    }
+
+    public static void main(String[] args) throws InterruptedException
+    {
+        run(1000);
+        run(3000);
+        run(2000);
+        run(500);
+        countDownLatch.await();
+        log.debug("主线程开始运行");
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-14  12:17:01.289  [Thread-3] DEBUG mao.t1.Test:  开始运行
+2022-09-14  12:17:01.289  [Thread-0] DEBUG mao.t1.Test:  开始运行
+2022-09-14  12:17:01.289  [Thread-1] DEBUG mao.t1.Test:  开始运行
+2022-09-14  12:17:01.289  [Thread-2] DEBUG mao.t1.Test:  开始运行
+2022-09-14  12:17:01.798  [Thread-3] DEBUG mao.t1.Test:  结束运行
+2022-09-14  12:17:02.304  [Thread-0] DEBUG mao.t1.Test:  结束运行
+2022-09-14  12:17:03.302  [Thread-2] DEBUG mao.t1.Test:  结束运行
+2022-09-14  12:17:04.301  [Thread-1] DEBUG mao.t1.Test:  结束运行
+2022-09-14  12:17:04.301  [main] DEBUG mao.t1.Test:  主线程开始运行
+```
+
+
+
+
+
+```java
+package mao.t1;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.CountDownLatch;
+
+/**
+ * Project name(项目名称)：java并发编程_CountdownLatch
+ * Package(包名): mao.t1
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/14
+ * Time(创建时间)： 12:10
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+
+    private static final CountDownLatch countDownLatch = new CountDownLatch(3);
+
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    /**
+     * 运行
+     *
+     * @param sleepTime 睡眠时间
+     */
+    public static void run(long sleepTime)
+    {
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                try
+                {
+                    log.debug("开始运行");
+                    try
+                    {
+                        Thread.sleep(sleepTime);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                }
+                finally
+                {
+                    log.debug("结束运行");
+                    countDownLatch.countDown();
+                }
+            }
+        }).start();
+    }
+
+    public static void main(String[] args) throws InterruptedException
+    {
+        run(1000);
+        run(3000);
+        run(2000);
+        run(500);
+        countDownLatch.await();
+        log.debug("主线程开始运行");
+    }
+}
+```
+
+
+
+```sh
+2022-09-14  12:17:55.513  [Thread-2] DEBUG mao.t1.Test:  开始运行
+2022-09-14  12:17:55.513  [Thread-1] DEBUG mao.t1.Test:  开始运行
+2022-09-14  12:17:55.513  [Thread-0] DEBUG mao.t1.Test:  开始运行
+2022-09-14  12:17:55.513  [Thread-3] DEBUG mao.t1.Test:  开始运行
+2022-09-14  12:17:56.031  [Thread-3] DEBUG mao.t1.Test:  结束运行
+2022-09-14  12:17:56.524  [Thread-0] DEBUG mao.t1.Test:  结束运行
+2022-09-14  12:17:57.524  [Thread-2] DEBUG mao.t1.Test:  结束运行
+2022-09-14  12:17:57.524  [main] DEBUG mao.t1.Test:  主线程开始运行
+2022-09-14  12:17:58.529  [Thread-1] DEBUG mao.t1.Test:  结束运行
+```
+
+
+
+
+
+可以配合线程池使用
+
+
+
+```java
+package mao.t2;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+/**
+ * Project name(项目名称)：java并发编程_CountdownLatch
+ * Package(包名): mao.t2
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/14
+ * Time(创建时间)： 12:22
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    private static final CountDownLatch countDownLatch = new CountDownLatch(5);
+
+    /**
+     * 线程池
+     */
+    private static final ExecutorService threadPool = Executors.newFixedThreadPool(2);
+
+    /**
+     * 日志
+     */
+    private static final Logger log = LoggerFactory.getLogger(Test.class);
+
+    public static void main(String[] args) throws InterruptedException
+    {
+        for (int i = 0; i < 5; i++)
+        {
+            threadPool.submit(new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    try
+                    {
+                        log.debug("开始运行");
+                        try
+                        {
+                            Thread.sleep(1000);
+                        }
+                        catch (InterruptedException e)
+                        {
+                            e.printStackTrace();
+                        }
+                    }
+                    finally
+                    {
+                        log.debug("结束运行");
+                        countDownLatch.countDown();
+                    }
+                }
+            });
+        }
+        countDownLatch.await();
+        log.debug("主线程开始运行");
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+2022-09-14  12:26:37.211  [pool-1-thread-1] DEBUG mao.t2.Test:  开始运行
+2022-09-14  12:26:37.211  [pool-1-thread-2] DEBUG mao.t2.Test:  开始运行
+2022-09-14  12:26:38.227  [pool-1-thread-1] DEBUG mao.t2.Test:  结束运行
+2022-09-14  12:26:38.227  [pool-1-thread-2] DEBUG mao.t2.Test:  结束运行
+2022-09-14  12:26:38.227  [pool-1-thread-2] DEBUG mao.t2.Test:  开始运行
+2022-09-14  12:26:38.227  [pool-1-thread-1] DEBUG mao.t2.Test:  开始运行
+2022-09-14  12:26:39.239  [pool-1-thread-2] DEBUG mao.t2.Test:  结束运行
+2022-09-14  12:26:39.239  [pool-1-thread-1] DEBUG mao.t2.Test:  结束运行
+2022-09-14  12:26:39.239  [pool-1-thread-2] DEBUG mao.t2.Test:  开始运行
+2022-09-14  12:26:40.252  [pool-1-thread-2] DEBUG mao.t2.Test:  结束运行
+2022-09-14  12:26:40.252  [main] DEBUG mao.t2.Test:  主线程开始运行
+```
+
+
+
+
+
+
+
+#### 游戏加载
+
+
+
+```java
+package mao.t3;
+
+import java.awt.*;
+import java.util.Arrays;
+import java.util.Random;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
+
+/**
+ * Project name(项目名称)：java并发编程_CountdownLatch
+ * Package(包名): mao.t3
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/14
+ * Time(创建时间)： 12:28
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    public static void main(String[] args) throws InterruptedException
+    {
+        AtomicInteger num = new AtomicInteger(0);
+
+        ExecutorService service = Executors.newFixedThreadPool(10);
+
+        CountDownLatch countDownLatch = new CountDownLatch(10);
+
+        String[] all = new String[10];
+        Random random = new Random();
+
+        for (int j = 0; j < 10; j++)
+        {
+            int x = j;
+            service.submit(new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    for (int i = 0; i <= 100; i++)
+                    {
+                        try
+                        {
+                            Thread.sleep(random.nextInt(500));
+                        }
+                        catch (InterruptedException ignored)
+                        {
+                        }
+                        all[x] = Thread.currentThread().getName() + "(" + (i + "%") + ")";
+                        System.out.print("\r" + Arrays.toString(all));
+                    }
+                    countDownLatch.countDown();
+                }
+            });
+        }
+
+        countDownLatch.await();
+        System.out.println();
+        Toolkit.getDefaultToolkit().beep();
+        System.out.println("加载完毕！！！");
+        service.shutdown();
+    }
+}
+```
+
+
+
+
+
+
+
+### CyclicBarrier
 
