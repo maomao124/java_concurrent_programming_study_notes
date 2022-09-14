@@ -26631,5 +26631,242 @@ y=200		z=200
 
 
 
-##### 原理
+#### ConcurrentHashMap 原理
+
+##### JDK 7 HashMap 并发死链
+
+
+
+```java
+package mao.t5;
+
+import java.util.HashMap;
+
+/**
+ * Project name(项目名称)：java并发编程_ConcurrentHashMap
+ * Package(包名): mao.t5
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/14
+ * Time(创建时间)： 20:27
+ * Version(版本): 1.0
+ * Description(描述)： 需要jdk7
+ */
+
+public class Test
+{
+    public static void main(String[] args)
+    {
+        // 测试 java 7 中哪些数字的 hash 结果相等
+        System.out.println("长度为16时，桶下标为1的key");
+        for (int i = 0; i < 64; i++)
+        {
+            if (hash(i) % 16 == 1)
+            {
+                System.out.println(i);
+            }
+        }
+        System.out.println("长度为32时，桶下标为1的key");
+        for (int i = 0; i < 64; i++)
+        {
+            if (hash(i) % 32 == 1)
+            {
+                System.out.println(i);
+            }
+        }
+        // 1, 35, 16, 50 当大小为16时，它们在一个桶内
+        final HashMap<Integer, Integer> map = new HashMap<Integer, Integer>();
+        // 放 12 个元素
+        map.put(2, null);
+        map.put(3, null);
+        map.put(4, null);
+        map.put(5, null);
+        map.put(6, null);
+        map.put(7, null);
+        map.put(8, null);
+        map.put(9, null);
+        map.put(10, null);
+        map.put(16, null);
+        map.put(35, null);
+        map.put(1, null);
+        System.out.println("扩容前大小[main]:" + map.size());
+        new Thread()
+        {
+            @Override
+            public void run()
+            {
+                // 放第 13 个元素, 发生扩容
+                map.put(50, null);
+                System.out.println("扩容后大小[Thread-0]:" + map.size());
+            }
+        }.start();
+
+        new Thread()
+        {
+            @Override
+            public void run()
+            {
+                // 放第 13 个元素, 发生扩容
+                map.put(50, null);
+                System.out.println("扩容后大小[Thread-1]:" + map.size());
+            }
+        }.start();
+    }
+
+    /**
+     * 获得哈希
+     *
+     * @param k k
+     * @return int
+     */
+    static int hash(Object k)
+    {
+        int h = 0;
+        if (0 != h && k instanceof String)
+        {
+            return sun.misc.Hashing.stringHash32((String) k);
+        }
+        h ^= k.hashCode();
+        h ^= (h >>> 20) ^ (h >>> 12);
+        return h ^ (h >>> 7) ^ (h >>> 4);
+    }
+}
+```
+
+
+
+
+
+调试工具使用 idea 
+
+在 HashMap 源码 590 行加断点
+
+```java
+int newCapacity = newTable.length;
+```
+
+
+
+断点的条件如下，目的是让 HashMap 在扩容为 32 时，并且线程为 Thread-0 或 Thread-1 时停下来
+
+
+
+断点暂停方式选择 Thread，否则在调试 Thread-0 时，Thread-1 无法恢复运行
+
+运行代码，程序在预料的断点位置停了下来，输出
+
+
+
+```sh
+长度为16时，桶下标为1的key 
+1 
+16 
+35 
+50 
+长度为32时，桶下标为1的key 
+1 
+35 
+扩容前大小[main]:12
+```
+
+
+
+接下来进入扩容流程调试
+
+在 HashMap 源码 594 行加断点
+
+
+
+```java
+Entry<K,V> next = e.next; // 593
+if (rehash) // 594行
+```
+
+
+
+这是为了观察 e 节点和 next 节点的状态，Thread-0 单步执行到 594 行，再 594 处再添加一个断点（条件 Thread.currentThread().getName().equals("Thread-0")）
+
+这时可以在 Variables 面板观察到 e 和 next 变量，使用 view as -> Object 查看节点状态
+
+
+
+```
+e     (1)->(35)->(16)->null 
+next  (35)->(16)->null
+```
+
+
+
+在 Threads 面板选中 Thread-1 恢复运行，可以看到控制台输出新的内容如下，Thread-1 扩容已完成
+
+```
+newTable[1] (35)->(1)->null
+```
+
+
+
+这时 Thread-0 还停在 594 处， Variables 面板变量的状态已经变化为
+
+```
+e     (1)->null 
+next  (35)->(1)->null 
+```
+
+
+
+因为 Thread-1 扩容时链表也是后加入的元素放入链表头，因此链表就倒过来了，但 Thread-1 虽然结果正确，但它结束后 Thread-0 还要继续运行
+
+
+
+接下来就可以单步调试（F8）观察死链的产生了
+
+
+
+下一轮循环到 594，将 e 搬迁到 newTable 链表头
+
+```
+newTable[1]        (1)->null
+e                  (35)->(1)->null
+next               (1)->null
+```
+
+
+
+下一轮循环到 594，将 e 搬迁到 newTable 链表头
+
+```
+newTable[1]         (35)->(1)->null 
+e                   (1)->null 
+next                null
+```
+
+
+
+再看看源码
+
+```java
+e.next = newTable[1];
+// 这时 e为 (1) ，下一节点为(35)，(35)的下一节点又是(1)，而(1)的下一节点是(35)...
+//e    (1)->(35)->(1)->(35)->...
+newTable[1] = e; 
+// 再尝试将 e 作为链表头, 死链已成
+//newTable[1]   (1)->(35)->(1)->(35)->...
+
+e = next;
+// 虽然 next 是 null, 会进入下一个链表的复制, 但死链已经形成了
+//next                null
+//e                   null
+```
+
+
+
+
+
+**源码分析：**
+
+
+
+
 
