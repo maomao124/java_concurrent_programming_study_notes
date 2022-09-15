@@ -28025,5 +28025,162 @@ public class Test
 
 ##### 原理
 
+###### 入队
+
+
+
+初始化链表 last = head = new Node(null); Dummy 节点用来占位，item 为 null
+
+
+
+![image-20220915190146628](img/java并发编程学习笔记/image-20220915190146628.png)
+
+
+
+
+
+当一个节点入队 last = last.next = node;
+
+
+
+![image-20220915190447708](img/java并发编程学习笔记/image-20220915190447708.png)
+
+
+
+![image-20220915190456502](img/java并发编程学习笔记/image-20220915190456502.png)
+
+
+
+再来一个节点入队 last = last.next = node;
+
+
+
+![image-20220915190534057](img/java并发编程学习笔记/image-20220915190534057.png)
+
+
+
+源码：
+
+```java
+/**
+ * Inserts the specified element at the tail of this queue, waiting if
+ * necessary for space to become available.
+ *
+ * @throws InterruptedException {@inheritDoc}
+ * @throws NullPointerException {@inheritDoc}
+ */
+public void put(E e) throws InterruptedException {
+    if (e == null) throw new NullPointerException();
+    final int c;
+    final Node<E> node = new Node<E>(e);
+    final ReentrantLock putLock = this.putLock;
+    final AtomicInteger count = this.count;
+    putLock.lockInterruptibly();
+    try {
+        /*
+         * Note that count is used in wait guard even though it is
+         * not protected by lock. This works because count can
+         * only decrease at this point (all other puts are shut
+         * out by lock), and we (or some other waiting put) are
+         * signalled if it ever changes from capacity. Similarly
+         * for all other uses of count in other wait guards.
+         */
+        while (count.get() == capacity) {
+            notFull.await();
+        }
+        enqueue(node);
+        c = count.getAndIncrement();
+        if (c + 1 < capacity)
+            notFull.signal();
+    } finally {
+        putLock.unlock();
+    }
+    if (c == 0)
+        signalNotEmpty();
+}
+
+
+
+    /**
+     * Links node at end of queue.
+     *
+     * @param node the node
+     */
+    private void enqueue(Node<E> node) {
+        // assert putLock.isHeldByCurrentThread();
+        // assert last.next == null;
+        last = last.next = node;
+    }
+
+
+    /**
+     * Signals a waiting take. Called only from put/offer (which do not
+     * otherwise ordinarily lock takeLock.)
+     */
+    private void signalNotEmpty() {
+        final ReentrantLock takeLock = this.takeLock;
+        takeLock.lock();
+        try {
+            notEmpty.signal();
+        } finally {
+            takeLock.unlock();
+        }
+    }
+```
+
+
+
+###### 出队
+
+
+
+h = head
+
+
+
+![image-20220915191156101](img/java并发编程学习笔记/image-20220915191156101.png)
+
+
+
+first = h.next
+
+
+
+![image-20220915191223036](img/java并发编程学习笔记/image-20220915191223036.png)
+
+
+
+h.next = h
+
+
+
+![image-20220915191329760](img/java并发编程学习笔记/image-20220915191329760.png)
+
+
+
+head = first
+
+
+
+![image-20220915191359043](img/java并发编程学习笔记/image-20220915191359043.png)
+
+
+
+E x = first.item;
+
+first.item = null; 
+
+return x;
+
+
+
+![image-20220915191517161](img/java并发编程学习笔记/image-20220915191517161.png)
+
+
+
+
+
+源码：
+
 
 
