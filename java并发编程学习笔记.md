@@ -27427,3 +27427,603 @@ Java 8 数组（Node） +（ 链表 Node | 红黑树 TreeNode ） 以下数组�
 
 ##### JDK 7 ConcurrentHashMap
 
+它维护了一个 segment 数组，每个 segment 对应一把锁
+
+* 优点：如果多个线程访问不同的 segment，实际是没有冲突的，这与 jdk8 中是类似的
+* 缺点：Segments 数组默认大小为16，这个容量初始化指定后就不能改变了，并且不是懒惰初始化
+
+
+
+
+
+###### 构造器
+
+
+
+```java
+/**
+ * jdk7 ConcurrentHashMap 构造方法
+ *
+ * @param initialCapacity  初始容量
+ * @param loadFactor       负荷系数
+ * @param concurrencyLevel 并发级别
+ */
+public ConcurrentHashMap(int initialCapacity, float loadFactor, int concurrencyLevel)
+{
+    if (!(loadFactor > 0) || initialCapacity < 0 || concurrencyLevel <= 0)
+    {
+        throw new IllegalArgumentException();
+    }
+    if (concurrencyLevel > MAX_SEGMENTS)
+    {
+        concurrencyLevel = MAX_SEGMENTS;
+    }
+    // ssize 必须是 2^n, 即 2, 4, 8, 16 ... 表示了 segments 数组的大小
+    int sshift = 0;
+    int ssize = 1;
+    while (ssize < concurrencyLevel)
+    {
+        ++sshift;
+        ssize <<= 1;
+    }
+    // segmentShift 默认是 32 - 4 = 28
+    this.segmentShift = 32 - sshift;
+    // segmentMask 默认是 15 即 0000 0000 0000 1111
+    this.segmentMask = ssize - 1;
+    if (initialCapacity > MAXIMUM_CAPACITY)
+    {
+        initialCapacity = MAXIMUM_CAPACITY;
+    }
+    int c = initialCapacity / ssize;
+    if (c * ssize < initialCapacity)
+    {
+        ++c;
+    }
+    int cap = MIN_SEGMENT_TABLE_CAPACITY;
+    while (cap < c)
+    {
+        cap <<= 1;
+    }
+    // 创建 segments and segments[0]
+    Segment<K, V> s0 =
+            new Segment<K, V>(loadFactor, (int) (cap * loadFactor),
+                    (HashEntry<K, V>[]) new HashEntry[cap]);
+    Segment<K, V>[] ss = (Segment<K, V>[]) new Segment[ssize];
+    UNSAFE.putOrderedObject(ss, SBASE, s0); // ordered write of segments[0]
+    this.segments = ss;
+}
+```
+
+
+
+
+
+###### put 流程
+
+
+
+```java
+/**
+ * put方法
+ *
+ * @param key   key
+ * @param value value
+ * @return {@link V}
+ */
+public V put(K key, V value)
+{
+    Segment<K, V> s;
+    if (value == null)
+    {
+        throw new NullPointerException();
+    }
+    int hash = hash(key);
+    // 计算出 segment 下标
+    int j = (hash >>> segmentShift) & segmentMask;
+
+    // 获得 segment 对象, 判断是否为 null, 是则创建该 segment
+    if ((s = (Segment<K, V>) UNSAFE.getObject
+            (segments, (j << SSHIFT) + SBASE)) == null)
+    {
+        // 这时不能确定是否真的为 null, 因为其它线程也发现该 segment 为 null,
+        // 因此在 ensureSegment 里用 cas 方式保证该 segment 安全性
+        s = ensureSegment(j);
+    }
+    // 进入 segment 的put 流程
+    return s.put(key, hash, value, false);
+}
+
+
+
+final V put(K key, int hash, V value, boolean onlyIfAbsent)
+{
+    // 尝试加锁
+    HashEntry<K, V> node = tryLock() ? null :
+            // 如果不成功, 进入 scanAndLockForPut 流程
+            // 如果是多核 cpu 最多 tryLock 64 次, 进入 lock 流程
+            // 在尝试期间, 还可以顺便看该节点在链表中有没有, 如果没有顺便创建出来
+            scanAndLockForPut(key, hash, value);
+
+    // 执行到这里 segment 已经被成功加锁, 可以安全执行
+    V oldValue;
+    try
+    {
+        HashEntry<K, V>[] tab = table;
+        int index = (tab.length - 1) & hash;
+        HashEntry<K, V> first = entryAt(tab, index);
+        for (HashEntry<K, V> e = first; ; )
+        {
+            if (e != null)
+            {
+                // 更新
+                K k;
+                if ((k = e.key) == key ||
+                        (e.hash == hash && key.equals(k)))
+                {
+                    oldValue = e.value;
+                    if (!onlyIfAbsent)
+                    {
+                        e.value = value;
+                        ++modCount;
+                    }
+                    break;
+                }
+                e = e.next;
+            }
+            else
+            {
+                // 新增
+                // 1) 之前等待锁时, node 已经被创建, next 指向链表头
+                if (node != null)
+                {
+                    node.setNext(first);
+                }
+                else
+                // 2) 创建新 node
+                {
+                    node = new HashEntry<K, V>(hash, key, value, first);
+                }
+                int c = count + 1;
+                // 3) 扩容
+                if (c > threshold && tab.length < MAXIMUM_CAPACITY)
+                {
+                    rehash(node);
+                }
+                else
+                // 将 node 作为链表头
+                {
+                    setEntryAt(tab, index, node);
+                }
+                ++modCount;
+                count = c;
+                oldValue = null;
+                break;
+            }
+        }
+    }
+    finally
+    {
+        unlock();
+    }
+    return oldValue;
+}
+```
+
+
+
+
+
+###### rehash 流程
+
+发生在 put 中，因为此时已经获得了锁，因此 rehash 时不需要考虑线程安全
+
+
+
+```java
+/**
+ * rehash方法
+ *
+ * @param node 节点
+ */
+private void rehash(HashEntry<K, V> node)
+{
+    HashEntry<K, V>[] oldTable = table;
+    int oldCapacity = oldTable.length;
+    int newCapacity = oldCapacity << 1;
+    threshold = (int) (newCapacity * loadFactor);
+    HashEntry<K, V>[] newTable =
+            (HashEntry<K, V>[]) new HashEntry[newCapacity];
+    int sizeMask = newCapacity - 1;
+    for (int i = 0; i < oldCapacity; i++)
+    {
+        HashEntry<K, V> e = oldTable[i];
+        if (e != null)
+        {
+            HashEntry<K, V> next = e.next;
+            int idx = e.hash & sizeMask;
+            if (next == null) // Single node on list
+            {
+                newTable[idx] = e;
+            }
+            else
+            { // Reuse consecutive sequence at same slot
+                HashEntry<K, V> lastRun = e;
+                int lastIdx = idx;
+                // 过一遍链表, 尽可能把 rehash 后 idx 不变的节点重用
+                for (HashEntry<K, V> last = next;
+                     last != null;
+                     last = last.next)
+                {
+                    int k = last.hash & sizeMask;
+                    if (k != lastIdx)
+                    {
+                        lastIdx = k;
+                        lastRun = last;
+                    }
+                }
+                newTable[lastIdx] = lastRun;
+                // 剩余节点需要新建
+                for (HashEntry<K, V> p = e; p != lastRun; p = p.next)
+                {
+                    V v = p.value;
+                    int h = p.hash;
+                    int k = h & sizeMask;
+                    HashEntry<K, V> n = newTable[k];
+                    newTable[k] = new HashEntry<K, V>(h, p.key, v, n);
+                }
+            }
+        }
+    }
+    // 扩容完成, 才加入新的节点
+    int nodeIndex = node.hash & sizeMask; // add the new node
+    node.setNext(newTable[nodeIndex]);
+    newTable[nodeIndex] = node;
+
+    // 替换为新的 HashEntry table
+    table = newTable;
+}
+```
+
+
+
+
+
+###### get 流程
+
+get 时并未加锁，用了 UNSAFE 方法保证了可见性，扩容过程中，get 先发生就从旧表取内容，get 后发生就从新表取内容
+
+
+
+```java
+/**
+ * get方法
+ *
+ * @param key key
+ * @return {@link V}
+ */
+public V get(Object key)
+{
+    Segment<K, V> s; // manually integrate access methods to reduce overhead
+    HashEntry<K, V>[] tab;
+    int h = hash(key);
+    // u 为 segment 对象在数组中的偏移量
+    long u = (((h >>> segmentShift) & segmentMask) << SSHIFT) + SBASE;
+    // s 即为 segment
+    if ((s = (Segment<K, V>) UNSAFE.getObjectVolatile(segments, u)) != null &&
+            (tab = s.table) != null)
+    {
+        for (HashEntry<K, V> e = (HashEntry<K, V>) UNSAFE.getObjectVolatile
+                (tab, ((long) (((tab.length - 1) & h)) << TSHIFT) + TBASE);
+             e != null; e = e.next)
+        {
+            K k;
+            if ((k = e.key) == key || (e.hash == h && key.equals(k)))
+            {
+                return e.value;
+            }
+        }
+    }
+    return null;
+}
+```
+
+
+
+
+
+###### size 计算流程
+
+* 计算元素个数前，先不加锁计算两次，如果前后两次结果如一样，认为个数正确返回
+* 如果不一样，进行重试，重试次数超过 3，将所有 segment 锁住，重新计算个数返回
+
+
+
+```java
+/**
+ * 计算大小
+ *
+ * @return int
+ */
+public int size()
+{
+    // Try a few times to get accurate count. On failure due to
+    // continuous async changes in table, resort to locking.
+    final Segment<K, V>[] segments = this.segments;
+    int size;
+    boolean overflow; // true if size overflows 32 bits
+    long sum; // sum of modCounts
+    long last = 0L; // previous sum
+    int retries = -1; // first iteration isn't retry
+    try
+    {
+        for (; ; )
+        {
+            if (retries++ == RETRIES_BEFORE_LOCK)
+            {
+                // 超过重试次数, 需要创建所有 segment 并加锁
+                for (int j = 0; j < segments.length; ++j)
+                {
+                    ensureSegment(j).lock(); // force creation
+                }
+            }
+            sum = 0L;
+            size = 0;
+            overflow = false;
+            for (int j = 0; j < segments.length; ++j)
+            {
+                Segment<K, V> seg = segmentAt(segments, j);
+                if (seg != null)
+                {
+                    sum += seg.modCount;
+                    int c = seg.count;
+                    if (c < 0 || (size += c) < 0)
+                    {
+                        overflow = true;
+                    }
+                }
+            }
+            if (sum == last)
+            {
+                break;
+            }
+            last = sum;
+        }
+    }
+    finally
+    {
+        if (retries > RETRIES_BEFORE_LOCK)
+        {
+            for (int j = 0; j < segments.length; ++j)
+            {
+                segmentAt(segments, j).unlock();
+            }
+        }
+    }
+    return overflow ? Integer.MAX_VALUE : size;
+}
+```
+
+
+
+
+
+
+
+
+
+#### LinkedBlockingQueue
+
+接口为BlockingQueue<E>
+
+
+
+![image-20220915142220004](img/java并发编程学习笔记/image-20220915142220004.png)
+
+
+
+##### 基本使用
+
+
+
+```java
+package mao.t1;
+
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+
+/**
+ * Project name(项目名称)：java并发编程_LinkedBlockingQueue
+ * Package(包名): mao.t1
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/15
+ * Time(创建时间)： 14:04
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    public static void main(String[] args)
+    {
+        LinkedBlockingQueue<Integer> linkedBlockingQueue = new LinkedBlockingQueue<>();
+        //BlockingQueue<Integer> linkedBlockingQueue = new LinkedBlockingQueue<>();
+
+        for (int i = 0; i < 5; i++)
+        {
+            try
+            {
+                linkedBlockingQueue.put(i);
+            }
+            catch (InterruptedException e)
+            {
+                e.printStackTrace();
+            }
+        }
+
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                try
+                {
+                    Thread.sleep(5000);
+                }
+                catch (InterruptedException e)
+                {
+                    e.printStackTrace();
+                }
+                try
+                {
+                    linkedBlockingQueue.put(10);
+                }
+                catch (InterruptedException e)
+                {
+                    e.printStackTrace();
+                }
+            }
+        }).start();
+
+        while (true)
+        {
+            try
+            {
+                System.out.println(linkedBlockingQueue.take());
+            }
+            catch (InterruptedException e)
+            {
+                e.printStackTrace();
+            }
+        }
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+0
+1
+2
+3
+4
+10
+```
+
+
+
+
+
+```java
+package mao.t2;
+
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+
+/**
+ * Project name(项目名称)：java并发编程_LinkedBlockingQueue
+ * Package(包名): mao.t2
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/15
+ * Time(创建时间)： 14:14
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    public static void main(String[] args)
+    {
+        BlockingQueue<Integer> blockingQueue = new LinkedBlockingQueue<>(5);
+
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                try
+                {
+                    Thread.sleep(3000);
+                }
+                catch (InterruptedException e)
+                {
+                    e.printStackTrace();
+                }
+
+                for (int i = 0; i < 8; i++)
+                {
+                    try
+                    {
+                        Integer integer = blockingQueue.take();
+                        System.out.println("取得元素：" + integer);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }).start();
+
+        for (int i = 0; i < 20; i++)
+        {
+            try
+            {
+                blockingQueue.put(i);
+            }
+            catch (InterruptedException e)
+            {
+                e.printStackTrace();
+            }
+            System.out.println("已添加元素：" + i);
+        }
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+已添加元素：0
+已添加元素：1
+已添加元素：2
+已添加元素：3
+已添加元素：4
+已添加元素：5
+取得元素：0
+取得元素：1
+取得元素：2
+取得元素：3
+已添加元素：6
+已添加元素：7
+取得元素：4
+已添加元素：8
+已添加元素：9
+已添加元素：10
+取得元素：5
+取得元素：6
+已添加元素：11
+已添加元素：12
+取得元素：7
+```
+
+
+
+
+
+
+
+##### 原理
+
+
+
