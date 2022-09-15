@@ -28182,5 +28182,145 @@ return x;
 
 源码：
 
+```java
+public E take() throws InterruptedException {
+    final E x;
+    final int c;
+    final AtomicInteger count = this.count;
+    final ReentrantLock takeLock = this.takeLock;
+    takeLock.lockInterruptibly();
+    try {
+        while (count.get() == 0) {
+            notEmpty.await();
+        }
+        x = dequeue();
+        c = count.getAndDecrement();
+        if (c > 1)
+            notEmpty.signal();
+    } finally {
+        takeLock.unlock();
+    }
+    if (c == capacity)
+        signalNotFull();
+    return x;
+}
 
+
+    /**
+     * Removes a node from head of queue.
+     *
+     * @return the node
+     */
+    private E dequeue() {
+        // assert takeLock.isHeldByCurrentThread();
+        // assert head.item == null;
+        Node<E> h = head;
+        Node<E> first = h.next;
+        h.next = h; // help GC
+        head = first;
+        E x = first.item;
+        first.item = null;
+        return x;
+    }
+
+
+
+    /**
+     * Signals a waiting put. Called only from take/poll.
+     */
+    private void signalNotFull() {
+        final ReentrantLock putLock = this.putLock;
+        putLock.lock();
+        try {
+            notFull.signal();
+        } finally {
+            putLock.unlock();
+        }
+    }
+```
+
+
+
+
+
+总结
+
+用了两把锁和 dummy 节点
+
+* 用一把锁，同一时刻，最多只允许有一个线程（生产者或消费者，二选一）执行
+* 用两把锁，同一时刻，可以允许两个线程同时（一个生产者与一个消费者）执行
+  * 消费者与消费者线程仍然串行
+  * 生产者与生产者线程仍然串行
+
+
+
+* 当节点总数大于 2 时（包括 dummy 节点），putLock 保证的是 last 节点的线程安全，takeLock 保证的是 head 节点的线程安全。两把锁保证了入队和出队没有竞争
+* 当节点总数等于 2 时（即一个 dummy 节点，一个正常节点）这时候，仍然是两把锁锁两个对象，不会竞争
+* 当节点总数等于 1 时（就一个 dummy 节点）这时 take 线程会被 notEmpty 条件阻塞，有竞争，会阻塞
+
+
+
+
+
+官方说明：
+
+```java
+/*
+     * A variant of the "two lock queue" algorithm.  The putLock gates
+     * entry to put (and offer), and has an associated condition for
+     * waiting puts.  Similarly for the takeLock.  The "count" field
+     * that they both rely on is maintained as an atomic to avoid
+     * needing to get both locks in most cases. Also, to minimize need
+     * for puts to get takeLock and vice-versa, cascading notifies are
+     * used. When a put notices that it has enabled at least one take,
+     * it signals taker. That taker in turn signals others if more
+     * items have been entered since the signal. And symmetrically for
+     * takes signalling puts. Operations such as remove(Object) and
+     * iterators acquire both locks.
+     *
+     * Visibility between writers and readers is provided as follows:
+     *
+     * Whenever an element is enqueued, the putLock is acquired and
+     * count updated.  A subsequent reader guarantees visibility to the
+     * enqueued Node by either acquiring the putLock (via fullyLock)
+     * or by acquiring the takeLock, and then reading n = count.get();
+     * this gives visibility to the first n items.
+     *
+     * To implement weakly consistent iterators, it appears we need to
+     * keep all Nodes GC-reachable from a predecessor dequeued Node.
+     * That would cause two problems:
+     * - allow a rogue Iterator to cause unbounded memory retention
+     * - cause cross-generational linking of old Nodes to new Nodes if
+     *   a Node was tenured while live, which generational GCs have a
+     *   hard time dealing with, causing repeated major collections.
+     * However, only non-deleted Nodes need to be reachable from
+     * dequeued Nodes, and reachability does not necessarily have to
+     * be of the kind understood by the GC.  We use the trick of
+     * linking a Node that has just been dequeued to itself.  Such a
+     * self-link implicitly means to advance to head.next.
+     */
+
+/*
+“双锁队列”算法的一种变体。 putLock 为 put （和 offer） 提供入口，并具有等待 put 的相关条件。
+对于 takeLock 也是如此。他们都依赖的“计数”字段作为原子维护，以避免在大多数情况下需要同时获得两个锁。
+此外，为了尽量减少 put 获取 takeLock 的需要，反之亦然，使用了级联通知。
+当一个看跌期权注意到它已经启用了至少一个 take 时，它会向 taker 发出信号。
+如果在发出信号后输入了更多项目，则该接受者反过来向其他人发出信号。并且对称地接受信号看跌。
+诸如 remove(Object) 和迭代器之类的操作获取这两个锁。
+写入者和读取者之间的可见性如下所示：每当一个元素入队时，都会获取 putLock 并更新计数。
+后续阅读器通过获取 putLock（通过完全锁定）或获取 takeLock，然后读取 n = count.get(); 来保证对入队节点的可见性。
+这提供了前 n 个项目的可见性。为了实现弱一致性迭代器，我们似乎需要让所有节点都可以从前一个出队节点中通过 GC 到达。
+这将导致两个问题： - 允许流氓迭代器导致无限的内存保留 - 如果节点在活动期间被终身使用，则会导致旧节点与新节点的跨代链接，
+这会导致分代 GC 难以处理，从而导致重复的主要收集.然而，只有未删除的节点需要从出队的节点可以到达，
+并且可达性不一定必须是 GC 理解的那种。我们使用将刚刚出队的节点链接到自身的技巧。这样的自链接隐含地意味着前进到 head.next。
+*/
+```
+
+
+
+
+
+
+
+#### ArrayBlockingQueue
 
