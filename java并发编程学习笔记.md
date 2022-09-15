@@ -28821,3 +28821,321 @@ public class Test
 
 ####  ConcurrentLinkedQueue
 
+基于链接节点的无界线程安全队列。此队列对元素进行 FIFO（先进先出）排序。队列的头部是在队列中时间最长的元素。队列的尾部是在队列中时间最短的元素。新元素被插入到队列的尾部，队列检索操作获取队列头部的元素。当许多线程将共享对公共集合的访问时， ConcurrentLinkedQueue是一个合适的选择。与大多数其他并发集合实现一样，此类不允许使用null元素。
+此实现采用了一种有效的非阻塞算法，该算法基于 Maged M. Michael 和 Michael L. Scott 在Simple、Fast、Practical Non-Blocking 和 Blocking Concurrent Queue Algorithms 中描述的算法。
+迭代器是弱一致的，返回的元素反映了在迭代器创建时或之后的某个时间点的队列状态。它们不会抛出java.util.ConcurrentModificationException ，并且可以与其他操作同时进行。自迭代器创建以来队列中包含的元素将仅返回一次。
+请注意，与大多数集合不同， size方法不是恒定时间操作。由于这些队列的异步特性，确定当前元素的数量需要遍历元素，因此如果在遍历期间修改了此集合，则可能会报告不准确的结果。
+添加、删除或检查多个元素的批量操作（例如addAll 、 removeIf或forEach ）不能保证以原子方式执行。例如，与addAll操作并发的forEach遍历可能只观察到一些添加的元素。
+此类及其迭代器实现了Queue和Iterator接口的所有可选方法。
+内存一致性效果：与其他并发集合一样，线程中的操作在将对象放入ConcurrentLinkedQueue之前发生在另一个线程中从ConcurrentLinkedQueue访问或删除该元素之后的操作。
+此类是Java Collections Framework的成员。
+
+
+
+说明
+
+```java
+/*
+     * This is a modification of the Michael & Scott algorithm,
+     * adapted for a garbage-collected environment, with support for
+     * interior node deletion (to support e.g. remove(Object)).  For
+     * explanation, read the paper.
+     *
+     * Note that like most non-blocking algorithms in this package,
+     * this implementation relies on the fact that in garbage
+     * collected systems, there is no possibility of ABA problems due
+     * to recycled nodes, so there is no need to use "counted
+     * pointers" or related techniques seen in versions used in
+     * non-GC'ed settings.
+     *
+     * The fundamental invariants are:
+     * - There is exactly one (last) Node with a null next reference,
+     *   which is CASed when enqueueing.  This last Node can be
+     *   reached in O(1) time from tail, but tail is merely an
+     *   optimization - it can always be reached in O(N) time from
+     *   head as well.
+     * - The elements contained in the queue are the non-null items in
+     *   Nodes that are reachable from head.  CASing the item
+     *   reference of a Node to null atomically removes it from the
+     *   queue.  Reachability of all elements from head must remain
+     *   true even in the case of concurrent modifications that cause
+     *   head to advance.  A dequeued Node may remain in use
+     *   indefinitely due to creation of an Iterator or simply a
+     *   poll() that has lost its time slice.
+     *
+     * The above might appear to imply that all Nodes are GC-reachable
+     * from a predecessor dequeued Node.  That would cause two problems:
+     * - allow a rogue Iterator to cause unbounded memory retention
+     * - cause cross-generational linking of old Nodes to new Nodes if
+     *   a Node was tenured while live, which generational GCs have a
+     *   hard time dealing with, causing repeated major collections.
+     * However, only non-deleted Nodes need to be reachable from
+     * dequeued Nodes, and reachability does not necessarily have to
+     * be of the kind understood by the GC.  We use the trick of
+     * linking a Node that has just been dequeued to itself.  Such a
+     * self-link implicitly means to advance to head.
+     *
+     * Both head and tail are permitted to lag.  In fact, failing to
+     * update them every time one could is a significant optimization
+     * (fewer CASes). As with LinkedTransferQueue (see the internal
+     * documentation for that class), we use a slack threshold of two;
+     * that is, we update head/tail when the current pointer appears
+     * to be two or more steps away from the first/last node.
+     *
+     * Since head and tail are updated concurrently and independently,
+     * it is possible for tail to lag behind head (why not)?
+     *
+     * CASing a Node's item reference to null atomically removes the
+     * element from the queue, leaving a "dead" node that should later
+     * be unlinked (but unlinking is merely an optimization).
+     * Interior element removal methods (other than Iterator.remove())
+     * keep track of the predecessor node during traversal so that the
+     * node can be CAS-unlinked.  Some traversal methods try to unlink
+     * any deleted nodes encountered during traversal.  See comments
+     * in bulkRemove.
+     *
+     * When constructing a Node (before enqueuing it) we avoid paying
+     * for a volatile write to item.  This allows the cost of enqueue
+     * to be "one-and-a-half" CASes.
+     *
+     * Both head and tail may or may not point to a Node with a
+     * non-null item.  If the queue is empty, all items must of course
+     * be null.  Upon creation, both head and tail refer to a dummy
+     * Node with null item.  Both head and tail are only updated using
+     * CAS, so they never regress, although again this is merely an
+     * optimization.
+     */
+
+/*
+*这是Michael&Scott算法的修改，
+*适用于垃圾收集环境，支持
+*内部节点删除（以支持例如删除（对象））。对于
+*解释，阅读文章。
+*
+*注意，与此包中的大多数非阻塞算法一样，
+*此实现依赖于以下事实：在垃圾中
+*收集系统，不存在ABA问题的可能性，因为
+*回收节点，因此不需要使用“计数”
+*中使用的版本中的“指针”或相关技术
+*非GC设置。
+*
+*基本不变量是：
+*-恰好有一个（最后一个）节点具有空的下一个引用，
+*这是排队时的情况。最后一个节点可以是
+*从尾部在O（1）时间内到达，但尾部仅是
+*优化-始终可以在O（N）时间内达到
+*还有头。
+*-队列中包含的元素是中的非空项
+*从头部可到达的节点。包装该项目
+*将节点引用为null会自动将其从
+*队列。必须保持头部所有元素的可达性
+*即使在并发修改导致
+*前进。出队节点可能仍在使用中
+*由于创建了迭代器或
+*poll（）已丢失其时间片。
+*
+*以上可能暗示所有节点都是GC可达的
+*来自前置出队节点。这将导致两个问题：
+*-允许流氓迭代器导致无限内存保留
+*-在以下情况下，导致旧节点与新节点的跨代链接：
+*一个节点在运行时是终身的，哪一代GCs具有
+*难以处理，导致重复的主要收集。
+*但是，只有未删除的节点需要从
+*出队节点和可达性不一定必须
+*属于GC理解的类型。我们使用的技巧
+*将刚刚退出队列的节点链接到自身。这样
+*自链接隐含地意味着前进到头部。
+*
+*头部和尾部都允许滞后。事实上，未能
+*每次更新都是一个重要的优化
+*（案例较少）。与LinkedTransferQueue一样（请参阅内部
+*该类的文档），我们使用两个松弛阈值；
+*也就是说，当当前指针出现时，我们更新头/尾
+*距离第一个/最后一个节点两步或两步以上。
+*
+*由于头部和尾部同时且独立地更新，
+*尾巴有可能落后于头部（为什么不）？
+*
+*将节点的项引用大小写为null会自动删除
+*元素，留下一个“死”节点
+*取消链接（但取消链接只是一种优化）。
+*内部元素移除方法（迭代器.remove（）除外）
+*在遍历过程中跟踪前置节点，以便
+*节点可以取消CAS链接。一些遍历方法试图取消链接
+*遍历过程中遇到的任何已删除节点。见评论
+*在bulkRemove中。
+*
+*在构造节点时（在排队之前），我们避免支付费用
+*对于易失性写入项。这允许排队的成本
+*是“一个半”的情况。
+*
+*头部和尾部都可以指向或不指向具有
+*非空项。如果队列为空，则所有项目当然必须
+*为空。创建时，头部和尾部均指虚拟对象
+*具有空项的节点。头部和尾部仅使用更新
+*CAS，因此它们从不倒退，尽管这只是
+*优化。
+*/
+```
+
+
+
+接口：
+
+```java
+public interface Queue<E> extends Collection<E> {
+    /**
+     * Inserts the specified element into this queue if it is possible to do so
+     * immediately without violating capacity restrictions, returning
+     * {@code true} upon success and throwing an {@code IllegalStateException}
+     * if no space is currently available.
+     *
+     * @param e the element to add
+     * @return {@code true} (as specified by {@link Collection#add})
+     * @throws IllegalStateException if the element cannot be added at this
+     *         time due to capacity restrictions
+     * @throws ClassCastException if the class of the specified element
+     *         prevents it from being added to this queue
+     * @throws NullPointerException if the specified element is null and
+     *         this queue does not permit null elements
+     * @throws IllegalArgumentException if some property of this element
+     *         prevents it from being added to this queue
+     */
+    boolean add(E e);
+
+    /**
+     * Inserts the specified element into this queue if it is possible to do
+     * so immediately without violating capacity restrictions.
+     * When using a capacity-restricted queue, this method is generally
+     * preferable to {@link #add}, which can fail to insert an element only
+     * by throwing an exception.
+     *
+     * @param e the element to add
+     * @return {@code true} if the element was added to this queue, else
+     *         {@code false}
+     * @throws ClassCastException if the class of the specified element
+     *         prevents it from being added to this queue
+     * @throws NullPointerException if the specified element is null and
+     *         this queue does not permit null elements
+     * @throws IllegalArgumentException if some property of this element
+     *         prevents it from being added to this queue
+     */
+    boolean offer(E e);
+
+    /**
+     * Retrieves and removes the head of this queue.  This method differs
+     * from {@link #poll() poll()} only in that it throws an exception if
+     * this queue is empty.
+     *
+     * @return the head of this queue
+     * @throws NoSuchElementException if this queue is empty
+     */
+    E remove();
+
+    /**
+     * Retrieves and removes the head of this queue,
+     * or returns {@code null} if this queue is empty.
+     *
+     * @return the head of this queue, or {@code null} if this queue is empty
+     */
+    E poll();
+
+    /**
+     * Retrieves, but does not remove, the head of this queue.  This method
+     * differs from {@link #peek peek} only in that it throws an exception
+     * if this queue is empty.
+     *
+     * @return the head of this queue
+     * @throws NoSuchElementException if this queue is empty
+     */
+    E element();
+
+    /**
+     * Retrieves, but does not remove, the head of this queue,
+     * or returns {@code null} if this queue is empty.
+     *
+     * @return the head of this queue, or {@code null} if this queue is empty
+     */
+    E peek();
+}
+```
+
+
+
+
+
+基本使用：
+
+```java
+package mao.t1;
+
+import java.util.Collections;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
+
+/**
+ * Project name(项目名称)：java并发编程_ConcurrentLinkedQueue
+ * Package(包名): mao.t1
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/15
+ * Time(创建时间)： 20:17
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    public static void main(String[] args)
+    {
+        Queue<Integer> queue = new ConcurrentLinkedQueue<>();
+
+        for (int i = 0; i < 10; i++)
+        {
+            System.out.println("入队：" + i + "，结果：" + queue.offer(i));
+        }
+
+        for (int i = 0; i < 10; i++)
+        {
+            System.out.println("出队："+ queue.poll());
+        }
+
+    }
+}
+```
+
+
+
+```sh
+入队：0，结果：true
+入队：1，结果：true
+入队：2，结果：true
+入队：3，结果：true
+入队：4，结果：true
+入队：5，结果：true
+入队：6，结果：true
+入队：7，结果：true
+入队：8，结果：true
+入队：9，结果：true
+出队：0
+出队：1
+出队：2
+出队：3
+出队：4
+出队：5
+出队：6
+出队：7
+出队：8
+出队：9
+```
+
+
+
+
+
+
+
+#### CopyOnWriteArrayList
+
