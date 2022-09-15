@@ -27352,3 +27352,78 @@ private final void addCount(long x, int check)
 
 ###### size 计算流程
 
+size 计算实际发生在 put，remove 改变集合元素的操作之中
+
+* 没有竞争发生，向 baseCount 累加计数
+* 有竞争发生，新建 counterCells，向其中的一个 cell 累加计数
+  * counterCells 初始有两个 cell
+  * 如果计数竞争比较激烈，会创建新的 cell 来累加计数
+
+
+
+```java
+/**
+ * 计算大小
+ *
+ * @return int
+ */
+public int size()
+{
+    long n = sumCount();
+    return ((n < 0L) ? 0 :
+            (n > (long) Integer.MAX_VALUE) ? Integer.MAX_VALUE :
+                    (int) n);
+}
+
+/**
+ * 和计数
+ *
+ * @return long
+ */
+final long sumCount()
+{
+    CounterCell[] as = counterCells;
+    CounterCell a;
+    // 将 baseCount 计数与所有 cell 计数累加
+    long sum = baseCount;
+    if (as != null)
+    {
+        for (int i = 0; i < as.length; ++i)
+        {
+            if ((a = as[i]) != null)
+            {
+                sum += a.value;
+            }
+        }
+    }
+    return sum;
+}
+```
+
+
+
+
+
+###### 总结
+
+
+
+Java 8 数组（Node） +（ 链表 Node | 红黑树 TreeNode ） 以下数组简称（table），链表简称（bin）
+
+* 初始化，使用 cas 来保证并发安全，懒惰初始化 table
+* 树化，当 table.length < 64 时，先尝试扩容，超过 64 时，并且 bin.length > 8 时，会将链表树化，树化过程会用 synchronized 锁住链表头
+* put，如果该 bin 尚未创建，只需要使用 cas 创建 bin；如果已经有了，锁住链表头进行后续 put 操作，元素添加至 bin的尾部
+* get，无锁操作仅需要保证可见性，扩容过程中 get 操作拿到的是 ForwardingNode 它会让 get 操作在新 table 进行搜索
+* 扩容，扩容时以 bin 为单位进行，需要对 bin 进行 synchronized，但这时妙的是其它竞争线程也不是无事可做，它们会帮助把其它 bin 进行扩容，扩容时平均只有 1/6 的节点会把复制到新 table 中
+* size，元素个数保存在 baseCount 中，并发时的个数变动保存在 CounterCell[] 当中。最后统计数量时累加即可
+
+
+
+
+
+
+
+
+
+##### JDK 7 ConcurrentHashMap
+
