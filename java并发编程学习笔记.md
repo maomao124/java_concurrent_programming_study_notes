@@ -28690,3 +28690,134 @@ public class Test
 
 
 
+
+
+```java
+package mao.t3;
+
+import java.util.concurrent.BlockingDeque;
+import java.util.concurrent.LinkedBlockingDeque;
+
+/**
+ * Project name(项目名称)：java并发编程_ArrayBlockingQueue_and_LinkedBlockingDeque
+ * Package(包名): mao.t3
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/15
+ * Time(创建时间)： 19:55
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    public static void main(String[] args) throws InterruptedException
+    {
+        BlockingDeque<Integer> blockingDeque = new LinkedBlockingDeque<>(10);
+
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                for (int i = 1; i < Integer.MAX_VALUE; i++)
+                {
+                    try
+                    {
+                        Thread.sleep(100);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
+
+                    if (i % 2 == 0)
+                    {
+                        try
+                        {
+                            blockingDeque.putFirst(i);
+                        }
+                        catch (InterruptedException e)
+                        {
+                            e.printStackTrace();
+                        }
+                    }
+                    else
+                    {
+                        try
+                        {
+                            blockingDeque.putLast(i);
+                        }
+                        catch (InterruptedException e)
+                        {
+                            e.printStackTrace();
+                        }
+                    }
+                }
+            }
+        }).start();
+
+
+        while (true)
+        {
+            Thread.sleep(1000);
+            for (int i = 0; i < 10; i++)
+            {
+                System.out.println("出队：" + blockingDeque.takeFirst());
+                //System.out.println("出队：" + blockingDeque.takeLast());
+            }
+            System.out.println();
+        }
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+出队：8
+出队：6
+出队：4
+出队：2
+出队：1
+出队：3
+出队：5
+出队：7
+出队：9
+出队：10
+
+出队：18
+出队：16
+出队：14
+出队：12
+出队：11
+出队：13
+出队：15
+出队：17
+出队：19
+出队：20
+
+出队：28
+出队：26
+出队：24
+出队：22
+出队：21
+出队：23
+出队：25
+出队：27
+出队：29
+出队：30
+```
+
+
+
+
+
+
+
+####  ConcurrentLinkedQueue
+
