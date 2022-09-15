@@ -26868,5 +26868,78 @@ e = next;
 
 
 
+```java
+void transfer(Entry[] newTable, boolean rehash)
+{
+    int newCapacity = newTable.length;
+    for (Entry<K, V> e : table)
+    {
+        while (null != e)
+        {
+            Entry<K, V> next = e.next;
+            // 1 处
+            if (rehash)
+            {
+                e.hash = null == e.key ? 0 : hash(e.key);
+            }
+            int i = indexFor(e.hash, newCapacity);
+            // 2 处
+            // 将新元素加入 newTable[i], 原 newTable[i] 作为新元素的 next
+            e.next = newTable[i];
+            newTable[i] = e;
+            e = next;
+        }
+    }
+}
+```
+
+
+
+假设 map 中初始元素是
+
+```
+原始链表，格式：[桶下标] (key,next)
+[1] (1,35)->(35,16)->(16,null)
+
+线程 a 执行到 1 处 ，此时局部变量 e 为 (1,35)，而局部变量 next 为 (35,16) 线程 a 挂起
+
+线程 b 开始执行
+第一次循环
+[1] (1,null)
+
+第二次循环
+[1] (35,1)->(1,null)
+
+第三次循环
+[1] (35,1)->(1,null)
+[17] (16,null)
+
+切换回线程 a，此时局部变量 e 和 next 被恢复，引用没变但内容变了：e 的内容被改为 (1,null)，而 next 的内
+容被改为 (35,1) 并链向 (1,null)
+第一次循环
+[1] (1,null)
+
+第二次循环，注意这时 e 是 (35,1) 并链向 (1,null) 所以 next 又是 (1,null)
+[1] (35,1)->(1,null)
+
+第三次循环，e 是 (1,null)，而 next 是 null，但 e 被放入链表头，这样 e.next 变成了 35 （2 处）
+[1] (1,35)->(35,1)->(1,35)
+
+已经是死链了
+```
+
+
+
+* 究其原因，是因为在多线程环境下使用了非线程安全的 map 集合
+* JDK 8 虽然将扩容算法做了调整，不再将元素加入链表头（而是保持与扩容前一样的顺序），但仍不意味着能 够在多线程环境下能够安全扩容，还会出现其它问题（如扩容丢数据）
+
+
+
+
+
+
+
+##### JDK 8 ConcurrentHashMap
+
 
 
