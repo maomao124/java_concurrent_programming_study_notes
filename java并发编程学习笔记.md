@@ -28324,3 +28324,369 @@ public E take() throws InterruptedException {
 
 #### ArrayBlockingQueue
 
+这是一个由数组支持的有界阻塞队列。此队列对元素进行 FIFO（先进先出）排序。队列的头部是在队列中时间最长的元素。队列的尾部是在队列中时间最短的元素。新元素被插入到队列的尾部，队列检索操作获取队列头部的元素。
+这是一个经典的“有界缓冲区”，其中一个固定大小的数组保存由生产者插入并由消费者提取的元素。一旦创建，容量将无法更改。尝试put元素放入完整队列将导致操作阻塞；尝试从空队列中take元素同样会阻塞。
+此类支持对等待的生产者和消费者线程进行排序的可选公平策略。默认情况下，不保证此排序。但是，公平性设置为true的队列以 FIFO 顺序授予线程访问权限。公平性通常会降低吞吐量，但会降低可变性并避免饥饿。
+
+
+
+
+
+```java
+package mao.t1;
+
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+
+/**
+ * Project name(项目名称)：java并发编程_ArrayBlockingQueue_and_LinkedBlockingDeque
+ * Package(包名): mao.t1
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/15
+ * Time(创建时间)： 19:36
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    public static void main(String[] args) throws InterruptedException
+    {
+        //创建具有给定（固定）容量和默认访问策略的ArrayBlockingQueue
+        BlockingQueue<Integer> blockingQueue = new ArrayBlockingQueue<>(10);
+
+        for (int i = 0; i < 5; i++)
+        {
+            blockingQueue.put(i);
+        }
+
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                try
+                {
+                    Thread.sleep(3000);
+                }
+                catch (InterruptedException e)
+                {
+                    e.printStackTrace();
+                }
+                try
+                {
+                    blockingQueue.put(10);
+                }
+                catch (InterruptedException e)
+                {
+                    e.printStackTrace();
+                }
+            }
+        }).start();
+
+        while (true)
+        {
+            System.out.println("出队：" + blockingQueue.take());
+        }
+    }
+}
+```
+
+
+
+```sh
+出队：0
+出队：1
+出队：2
+出队：3
+出队：4
+出队：10
+```
+
+
+
+
+
+ LinkedBlockingQueue 与 ArrayBlockingQueue 的性能比较
+
+* Linked 支持有界，Array 强制有界
+* Linked 实现是链表，Array 实现是数组
+* Linked 是懒惰的，而 Array 需要提前初始化 Node 数组
+* Linked 每次入队会生成新 Node，而 Array 的 Node 是提前创建好的
+* Linked 两把锁，Array 一把锁
+
+
+
+
+
+
+
+
+
+
+
+#### LinkedBlockingDeque
+
+基于链接节点的可选有界阻塞双端队列。
+可选的容量绑定构造函数参数用作防止过度扩展的一种方式。容量（如果未指定）等于Integer.MAX_VALUE 。链接节点在每次插入时动态创建，除非这会使双端队列超出容量。
+大多数操作都在恒定时间内运行（忽略阻塞所花费的时间）。例外情况包括remove 、 removeFirstOccurrence 、 removeLastOccurrence 、 contains 、 iterator.remove()和批量操作，所有这些操作都以线性时间运行。
+此类及其迭代器实现了Collection和Iterator接口的所有可选方法。
+
+
+
+
+
+接口：
+
+```java
+public interface BlockingDeque<E> extends BlockingQueue<E>, Deque<E> {
+    /*
+     * We have "diamond" multiple interface inheritance here, and that
+     * introduces ambiguities.  Methods might end up with different
+     * specs depending on the branch chosen by javadoc.  Thus a lot of
+     * methods specs here are copied from superinterfaces.
+     */
+
+    /**
+     * Inserts the specified element at the front of this deque if it is
+     * possible to do so immediately without violating capacity restrictions,
+     * throwing an {@code IllegalStateException} if no space is currently
+     * available.  When using a capacity-restricted deque, it is generally
+     * preferable to use {@link #offerFirst(Object) offerFirst}.
+     *
+     * @param e the element to add
+     * @throws IllegalStateException {@inheritDoc}
+     * @throws ClassCastException {@inheritDoc}
+     * @throws NullPointerException if the specified element is null
+     * @throws IllegalArgumentException {@inheritDoc}
+     */
+    void addFirst(E e);
+
+    /**
+     * Inserts the specified element at the end of this deque if it is
+     * possible to do so immediately without violating capacity restrictions,
+     * throwing an {@code IllegalStateException} if no space is currently
+     * available.  When using a capacity-restricted deque, it is generally
+     * preferable to use {@link #offerLast(Object) offerLast}.
+     *
+     * @param e the element to add
+     * @throws IllegalStateException {@inheritDoc}
+     * @throws ClassCastException {@inheritDoc}
+     * @throws NullPointerException if the specified element is null
+     * @throws IllegalArgumentException {@inheritDoc}
+     */
+    void addLast(E e);
+
+    /**
+     * Inserts the specified element at the front of this deque if it is
+     * possible to do so immediately without violating capacity restrictions,
+     * returning {@code true} upon success and {@code false} if no space is
+     * currently available.
+     * When using a capacity-restricted deque, this method is generally
+     * preferable to the {@link #addFirst(Object) addFirst} method, which can
+     * fail to insert an element only by throwing an exception.
+     *
+     * @param e the element to add
+     * @throws ClassCastException {@inheritDoc}
+     * @throws NullPointerException if the specified element is null
+     * @throws IllegalArgumentException {@inheritDoc}
+     */
+    boolean offerFirst(E e);
+
+    /**
+     * Inserts the specified element at the end of this deque if it is
+     * possible to do so immediately without violating capacity restrictions,
+     * returning {@code true} upon success and {@code false} if no space is
+     * currently available.
+     * When using a capacity-restricted deque, this method is generally
+     * preferable to the {@link #addLast(Object) addLast} method, which can
+     * fail to insert an element only by throwing an exception.
+     *
+     * @param e the element to add
+     * @throws ClassCastException {@inheritDoc}
+     * @throws NullPointerException if the specified element is null
+     * @throws IllegalArgumentException {@inheritDoc}
+     */
+    boolean offerLast(E e);
+
+    /**
+     * Inserts the specified element at the front of this deque,
+     * waiting if necessary for space to become available.
+     *
+     * @param e the element to add
+     * @throws InterruptedException if interrupted while waiting
+     * @throws ClassCastException if the class of the specified element
+     *         prevents it from being added to this deque
+     * @throws NullPointerException if the specified element is null
+     * @throws IllegalArgumentException if some property of the specified
+     *         element prevents it from being added to this deque
+     */
+    void putFirst(E e) throws InterruptedException;
+
+    /**
+     * Inserts the specified element at the end of this deque,
+     * waiting if necessary for space to become available.
+     *
+     * @param e the element to add
+     * @throws InterruptedException if interrupted while waiting
+     * @throws ClassCastException if the class of the specified element
+     *         prevents it from being added to this deque
+     * @throws NullPointerException if the specified element is null
+     * @throws IllegalArgumentException if some property of the specified
+     *         element prevents it from being added to this deque
+     */
+    void putLast(E e) throws InterruptedException;
+
+    /**
+     * Inserts the specified element at the front of this deque,
+     * waiting up to the specified wait time if necessary for space to
+     * become available.
+     *
+     * @param e the element to add
+     * @param timeout how long to wait before giving up, in units of
+     *        {@code unit}
+     * @param unit a {@code TimeUnit} determining how to interpret the
+     *        {@code timeout} parameter
+     * @return {@code true} if successful, or {@code false} if
+     *         the specified waiting time elapses before space is available
+     * @throws InterruptedException if interrupted while waiting
+     * @throws ClassCastException if the class of the specified element
+     *         prevents it from being added to this deque
+     * @throws NullPointerException if the specified element is null
+     * @throws IllegalArgumentException if some property of the specified
+     *         element prevents it from being added to this deque
+     */
+    boolean offerFirst(E e, long timeout, TimeUnit unit)
+        throws InterruptedException;
+
+    /**
+     * Inserts the specified element at the end of this deque,
+     * waiting up to the specified wait time if necessary for space to
+     * become available.
+     *
+     * @param e the element to add
+     * @param timeout how long to wait before giving up, in units of
+     *        {@code unit}
+     * @param unit a {@code TimeUnit} determining how to interpret the
+     *        {@code timeout} parameter
+     * @return {@code true} if successful, or {@code false} if
+     *         the specified waiting time elapses before space is available
+     * @throws InterruptedException if interrupted while waiting
+     * @throws ClassCastException if the class of the specified element
+     *         prevents it from being added to this deque
+     * @throws NullPointerException if the specified element is null
+     * @throws IllegalArgumentException if some property of the specified
+     *         element prevents it from being added to this deque
+     */
+    boolean offerLast(E e, long timeout, TimeUnit unit)
+        throws InterruptedException;
+
+    /**
+     * Retrieves and removes the first element of this deque, waiting
+     * if necessary until an element becomes available.
+     *
+     * @return the head of this deque
+     * @throws InterruptedException if interrupted while waiting
+     */
+    E takeFirst() throws InterruptedException;
+
+    /**
+     * Retrieves and removes the last element of this deque, waiting
+     * if necessary until an element becomes available.
+     *
+     * @return the tail of this deque
+     * @throws InterruptedException if interrupted while waiting
+     */
+    E takeLast() throws InterruptedException;
+    
+ ...
+     
+}
+```
+
+
+
+
+
+使用：
+
+
+
+```java
+package mao.t2;
+
+import java.util.concurrent.BlockingDeque;
+import java.util.concurrent.LinkedBlockingDeque;
+
+/**
+ * Project name(项目名称)：java并发编程_ArrayBlockingQueue_and_LinkedBlockingDeque
+ * Package(包名): mao.t2
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/15
+ * Time(创建时间)： 19:44
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    public static void main(String[] args) throws InterruptedException
+    {
+        //创建一个容量为Integer.MAX_VALUE的LinkedBlockingDeque 。
+        BlockingDeque<Integer> blockingDeque = new LinkedBlockingDeque<>();
+
+        for (int i = 0; i < 20; i++)
+        {
+            blockingDeque.putLast(i);
+        }
+
+        for (int i = 0; i < 30; i++)
+        {
+            if (i % 2 == 0)
+            {
+                System.out.println("出队第一个元素：" + blockingDeque.takeFirst());
+            }
+            else
+            {
+                System.out.println("出队最后一个元素：" + blockingDeque.takeLast());
+            }
+        }
+    }
+}
+```
+
+
+
+运行结果：
+
+```sh
+出队第一个元素：0
+出队最后一个元素：19
+出队第一个元素：1
+出队最后一个元素：18
+出队第一个元素：2
+出队最后一个元素：17
+出队第一个元素：3
+出队最后一个元素：16
+出队第一个元素：4
+出队最后一个元素：15
+出队第一个元素：5
+出队最后一个元素：14
+出队第一个元素：6
+出队最后一个元素：13
+出队第一个元素：7
+出队最后一个元素：12
+出队第一个元素：8
+出队最后一个元素：11
+出队第一个元素：9
+出队最后一个元素：10
+```
+
+
+
