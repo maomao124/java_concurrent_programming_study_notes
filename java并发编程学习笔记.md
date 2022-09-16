@@ -29139,3 +29139,182 @@ public class Test
 
 #### CopyOnWriteArrayList
 
+CopyOnWriteArraySet 是它的马甲 底层实现采用了 写入时拷贝 的思想，增删改操作会将底层数组拷贝一份，更改操作在新数组上执行，这时不影响其它线程的并发读，读写分离。
+
+适合『读多写少』的应用场景
+
+
+
+ArrayList的线程安全变体，其中所有可变操作（ add 、 set等）都是通过制作底层数组的新副本来实现的。
+这通常成本太高，但当遍历操作的数量大大超过突变时，它可能比替代方法更有效，并且在您不能或不想同步遍历但需要排除并发线程之间的干扰时很有用。 “快照”风格的迭代器方法使用对创建迭代器时数组状态的引用。这个数组在迭代器的生命周期内永远不会改变，所以干扰是不可能的，并且迭代器保证不会抛出ConcurrentModificationException 。自创建迭代器以来，迭代器不会反映对列表的添加、删除或更改。不支持迭代器本身的元素更改操作（ remove 、 set和add ）。这些方法抛出UnsupportedOperationException 。
+允许所有元素，包括null 。
+内存一致性效果：与其他并发集合一样，线程中的操作在将对象放入CopyOnWriteArrayList之前发生在另一个线程中从CopyOnWriteArrayList访问或删除该元素之后的操作。
+此类是Java Collections Framework的成员。
+
+
+
+```java
+package mao.t1;
+
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+
+/**
+ * Project name(项目名称)：java并发编程_CopyOnWriteArrayList
+ * Package(包名): mao.t1
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/16
+ * Time(创建时间)： 13:17
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    public static void main(String[] args)
+    {
+        List<Integer> list = new CopyOnWriteArrayList<>();
+        list.add(1);
+        System.out.println(list.remove(0));
+    }
+}
+```
+
+
+
+
+
+add方法
+
+```java
+ /**
+     * Appends the specified element to the end of this list.
+     *
+     * @param e element to be appended to this list
+     * @return {@code true} (as specified by {@link Collection#add})
+     */
+    public boolean add(E e)
+    {
+        synchronized (lock)
+        {
+            // 获取旧的数组
+            Object[] es = getArray();
+            int len = es.length;
+            // 拷贝新的数组（这里是比较耗时的操作，但不影响其它读线程）
+            es = Arrays.copyOf(es, len + 1);
+            // 添加新元素
+            es[len] = e;
+            // 替换旧的数组
+            setArray(es);
+            return true;
+        }
+    }
+```
+
+
+
+其它读操作并未加锁
+
+
+
+get 弱一致性
+
+
+
+```java
+/**
+ * {@inheritDoc}
+ *
+ * @throws IndexOutOfBoundsException {@inheritDoc}
+ */
+public E get(int index) {
+    return elementAt(getArray(), index);
+}
+
+@SuppressWarnings("unchecked")
+static <E> E elementAt(Object[] a, int index) {
+    return (E) a[index];
+}
+```
+
+
+
+![image-20220916132816451](img/java并发编程学习笔记/image-20220916132816451.png)
+
+
+
+![image-20220916132834816](img/java并发编程学习笔记/image-20220916132834816.png)
+
+
+
+
+
+迭代器弱一致性
+
+```java
+package mao.t2;
+
+import java.util.Iterator;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+
+/**
+ * Project name(项目名称)：java并发编程_CopyOnWriteArrayList
+ * Package(包名): mao.t2
+ * Class(类名): Test
+ * Author(作者）: mao
+ * Author QQ：1296193245
+ * GitHub：https://github.com/maomao124/
+ * Date(创建日期)： 2022/9/16
+ * Time(创建时间)： 13:29
+ * Version(版本): 1.0
+ * Description(描述)： 无
+ */
+
+public class Test
+{
+    public static void main(String[] args) throws InterruptedException
+    {
+        List<Integer> list = new CopyOnWriteArrayList<>();
+
+        for (int i = 0; i < 5; i++)
+        {
+            list.add(i);
+        }
+
+        Iterator<Integer> iterator = list.iterator();
+
+        new Thread(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                list.remove(0);
+                System.out.println(list);
+            }
+        }).start();
+
+        Thread.sleep(1000);
+
+        while (iterator.hasNext())
+        {
+            System.out.println(iterator.next());
+        }
+    }
+}
+```
+
+```sh
+[1, 2, 3, 4]
+0
+1
+2
+3
+4
+```
+
+
+
